@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bảng chấm turn</title>
+<link rel="stylesheet" href="fonts-embedded.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <h1>Bảng chấm turn</h1>
+    <span id="today-label" class="today"></span>
+  </div>
+  <div class="topbar-actions">
+    <button id="btn-undo" class="btn ghost" title="Hoàn tác hành động cuối">↶ Hoàn tác</button>
+    <button id="btn-add" class="btn ghost">＋ Thêm thợ</button>
+    <button id="btn-summary" class="btn ghost">Tổng kết</button>
+    <button id="btn-settings" class="btn ghost" title="Cài đặt">⚙</button>
+    <button id="btn-newday" class="btn primary">Ngày mới</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="board">
+    <div class="section-head">
+      <h2>Hàng chờ <span id="queue-count" class="pill"></span></h2>
+      <p class="hint">Ai ít turn nhất đứng đầu. Hoà thì ai làm khách lâu hơn đứng trước.</p>
+    </div>
+    <div id="queue" class="cards"></div>
+
+    <div id="bench-wrap" class="bench hidden">
+      <div class="section-head">
+        <h2>Tạm nghỉ / Đã về</h2>
+      </div>
+      <div id="bench" class="cards small"></div>
+    </div>
+
+    <div id="empty" class="empty hidden">
+      <p>Chưa có thợ nào trong ca hôm nay.</p>
+      <button class="btn primary" data-action="open-add">＋ Thêm thợ</button>
+    </div>
+  </section>
+
+  <aside class="logpanel">
+    <div class="section-head">
+      <h2>Nhật ký hôm nay</h2>
+    </div>
+    <ol id="log" class="log"></ol>
+  </aside>
+</main>
+
+<!-- Modal: Nhận khách -->
+<dialog id="dlg-assign" class="modal">
+  <form method="dialog" id="form-assign">
+    <h3>Nhận khách — <span id="assign-name"></span></h3>
+    <div class="field">
+      <label>Tính bao nhiêu turn?</label>
+      <div class="segmented" id="weight-seg">
+        <button type="button" data-w="1" class="on">1 turn<small>full set, dịch vụ thường</small></button>
+        <button type="button" data-w="0.5">½ turn<small>mani thường, đổi nước sơn</small></button>
+        <button type="button" data-w="0">0<small>không tính</small></button>
+        <button type="button" data-w="custom">Khác<small>tự nhập</small></button>
+      </div>
+      <input type="number" id="weight-custom" class="input hidden" step="0.25" min="0" placeholder="vd 1.5">
+    </div>
+    <div class="field">
+      <label>Làm chung với ai? <span class="muted">(bỏ trống nếu làm 1 mình)</span></label>
+      <div id="coworkers" class="chips"></div>
+    </div>
+    <div id="split-wrap" class="field hidden">
+      <label>Chia turn từng người</label>
+      <div id="split-rows" class="split"></div>
+    </div>
+    <div class="field">
+      <label>Ghi chú <span class="muted">(tuỳ chọn)</span></label>
+      <input type="text" id="assign-note" class="input" placeholder="vd: request, full set gel, chân...">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>Huỷ</button>
+      <button type="submit" class="btn primary">Xác nhận</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Modal: Sửa điểm -->
+<dialog id="dlg-adjust" class="modal">
+  <form method="dialog" id="form-adjust">
+    <h3>Sửa điểm — <span id="adjust-name"></span></h3>
+    <p class="muted">Đang có <b id="adjust-current" class="mono"></b> turn.</p>
+    <div class="segmented" id="adjust-seg">
+      <button type="button" data-d="-1">−1</button>
+      <button type="button" data-d="-0.5">−½</button>
+      <button type="button" data-d="0.5" class="on">+½</button>
+      <button type="button" data-d="1">+1</button>
+      <button type="button" data-d="custom">Khác</button>
+    </div>
+    <input type="number" id="adjust-custom" class="input hidden" step="0.25" placeholder="vd -0.25 hoặc 2">
+    <div class="field">
+      <label>Lý do <span class="muted">(tuỳ chọn)</span></label>
+      <input type="text" id="adjust-note" class="input" placeholder="vd: hôm qua còn nợ 1 turn">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>Huỷ</button>
+      <button type="submit" class="btn primary">Lưu</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Modal: Thêm thợ -->
+<dialog id="dlg-add" class="modal">
+  <form method="dialog" id="form-add">
+    <h3>Thêm thợ vào ca</h3>
+    <div class="field">
+      <label>Tên thợ</label>
+      <input type="text" id="add-name" class="input" placeholder="vd: Chị Lan" autocomplete="off" required>
+    </div>
+    <div id="add-roster-wrap" class="field hidden">
+      <label>Hoặc chọn thợ có sẵn hôm nay chưa vào ca</label>
+      <div id="add-roster" class="chips"></div>
+    </div>
+    <p class="muted" id="add-hint"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>Huỷ</button>
+      <button type="submit" class="btn primary">Thêm</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Modal: Ngày mới -->
+<dialog id="dlg-newday" class="modal">
+  <form method="dialog" id="form-newday">
+    <h3>Bắt đầu ngày mới</h3>
+    <p class="muted">Điểm về 0, nhật ký xoá. Chọn ai đi làm hôm nay và sắp thứ tự vào ca (trên cùng = vào trước).</p>
+    <div id="newday-list" class="roster"></div>
+    <div class="field row">
+      <input type="text" id="newday-newname" class="input" placeholder="Thêm thợ mới..." autocomplete="off">
+      <button type="button" class="btn ghost" id="newday-addname">＋</button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>Để sau</button>
+      <button type="submit" class="btn primary">Bắt đầu ngày mới</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Modal: Tổng kết -->
+<dialog id="dlg-summary" class="modal">
+  <div>
+    <h3>Tổng kết hôm nay</h3>
+    <table class="table" id="summary-table">
+      <thead><tr><th>Thợ</th><th>Khách</th><th>Turn</th><th>Skip</th><th>Trạng thái</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="modal-actions">
+      <button type="button" class="btn primary" data-close>Đóng</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Modal: Cài đặt -->
+<dialog id="dlg-settings" class="modal">
+  <div>
+    <h3>Cài đặt</h3>
+    <label class="toggle">
+      <input type="checkbox" id="set-skipcosts">
+      <span><b>Skip = mất lượt</b><small>Bật: bỏ lượt bị tính +1 turn, xuống cuối. Tắt: bỏ lượt không mất gì, vẫn là NEXT.</small></span>
+    </label>
+    <label class="toggle">
+      <input type="checkbox" id="set-latecatchup">
+      <span><b>Vào trễ = bắt kịp điểm</b><small>Bật: thợ vào trễ khởi đầu bằng điểm thấp nhất hiện tại (không cướp hết khách của người tới sớm). Tắt: khởi đầu 0.</small></span>
+    </label>
+    <div class="field">
+      <label>Danh sách thợ</label>
+      <div id="settings-roster" class="roster"></div>
+    </div>
+    <div class="field row">
+      <button type="button" class="btn ghost" id="btn-export">Sao lưu (tải JSON)</button>
+      <button type="button" class="btn ghost" id="btn-import">Nạp lại từ JSON</button>
+      <input type="file" id="import-file" accept="application/json" class="hidden">
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn primary" data-close>Đóng</button>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="turn-logic.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
