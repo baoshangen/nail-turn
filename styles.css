@@ -173,7 +173,7 @@ h1 { white-space: nowrap; }
   gap: 28px; padding: 28px; max-width: 1560px; margin: 0 auto;
 }
 @media (max-width: 1250px) { .layout { grid-template-columns: minmax(0, 1fr) 296px; gap: 20px; padding: 22px; } .board .cards { grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); } }
-@media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } .logpanel { position: static; max-height: 420px; } }
+
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .hint { color: var(--ink-3); font-size: 12.5px; }
 
@@ -426,4 +426,34 @@ h1 { white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .card { transform: none; }
+}
+
+/* ── CHẾ ĐỘ GỌN: cửa sổ hẹp (xài chung màn hình với app khác, vd Fresha) ──
+   Thẻ thợ đổi từ khối dọc to → hàng ngang 2 dòng; giấu chữ phụ; nhật ký thu gọn có cuộn riêng. */
+@media (max-width: 1080px) {
+  .layout { grid-template-columns: 1fr; padding: 14px; gap: 16px; }
+  .logpanel { position: static; }
+  .logpanel .log { max-height: 300px; }
+  .hint { display: none; }
+  .board .cards, .board .cards.small { grid-template-columns: 1fr; gap: 8px; }
+  .card, .card.next { grid-column: auto; }
+  .card {
+    flex-direction: row; flex-wrap: wrap; align-items: center;
+    gap: 4px 10px; padding: 10px 14px;
+  }
+  .card-top { display: contents; }
+  .rank { order: 0; }
+  .card-name { order: 1; font-size: 17px; }
+  .badge { order: 2; }
+  .card-points { order: 3; margin-left: auto; }
+  .card-points b, .card-points.small b { font-size: 26px; }
+  .card-points span { font-size: 11px; }
+  .card-meta { display: none; }
+  .jobs { order: 4; flex-basis: 100%; }
+  .pending { order: 5; flex-basis: 100%; margin-top: 4px; }
+  .card-actions { order: 6; flex-basis: 100%; margin-top: 4px; gap: 6px; }
+  .card-actions .btn.primary { flex: 1 1 auto; padding: 9px; font-size: 14px; }
+  .card-actions .btn { padding: 7px 10px; font-size: 12px; }
+  .job { padding: 8px 10px; }
+  .btn.done { padding: 8px 14px; }
 }
