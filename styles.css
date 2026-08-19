@@ -123,6 +123,22 @@ h1 { white-space: nowrap; }
   .queue-stat { margin-right: 4px; padding-right: 10px; }
   #hero3d { width: 88px; height: 88px; margin: -10px 0; }
 }
+/* Điện thoại: header xếp 2 tầng — thương hiệu trên, nút dưới, không chồng chữ */
+@media (max-width: 720px) {
+  .topbar { flex-wrap: wrap; position: static; padding: 8px 12px 10px; gap: 8px; }
+  .brand { width: 100%; }
+  .brand-text { min-width: 0; }
+  h1 { font-size: 22px; white-space: normal; line-height: 1.1; }
+  .topbar-actions { width: 100%; justify-content: flex-start; gap: 6px; }
+  .topbar-actions .btn { padding: 8px 10px; font-size: 13px; }
+  .queue-stat { margin-right: 2px; padding-right: 8px; }
+  .queue-stat b { font-size: 22px; }
+  #hero3d { width: 72px; height: 72px; margin: -6px 0; }
+  .layout { padding: 14px; gap: 16px; }
+  .section-head { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .job { flex-wrap: wrap; }
+  .btn.done { flex: 1 1 100%; }
+}
 
 /* ── Buttons ─────────────────────────────────────────── */
 .btn {

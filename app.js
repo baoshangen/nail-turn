@@ -38,17 +38,32 @@
     var days = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
     return days[d.getDay()] + ', ' + p[2] + '/' + p[1] + '/' + p[0];
   }
-  function nameOf(id) { var t = L.findTech(state, id); return t ? t.name : '?'; }
-  // Mỗi thợ 1 màu sơn cố định (băm id → 1 trong 8 shade). Dùng cho chấm màu thẻ + chai 3D.
+  // Tên thợ: tra danh sách hiện tại; thợ đã bị xoá thì tra sổ tên cũ (state.names) để nhật ký không thành "?"
+  function nameOf(id) {
+    var t = L.findTech(state, id);
+    if (t) return t.name;
+    return (state.names && state.names[id]) || '?';
+  }
+  // Mỗi thợ 1 màu sơn CỐ ĐỊNH, gán 1 lần rồi lưu trong state.colors (không đổi khi xoá thợ khác).
   var SHADES = ['#B8707C', '#C4384D', '#E27C6A', '#7B4B7A', '#B48EA6', '#4F9A93', '#EBD9CC', '#6E1E2C'];
   var DEFAULT_SHADE = '#B8707C';
   function colorOf(id) {
     if (!id) return DEFAULT_SHADE;
-    var h = 0;
-    for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-    // tránh trùng màu giữa các thợ đang trong danh sách nếu có thể: xoay theo thứ tự xuất hiện
-    var idx = state.techs.findIndex(function (t) { return t.id === id; });
-    return SHADES[(idx >= 0 ? idx : h) % SHADES.length];
+    if (!state.colors) state.colors = {};
+    if (state.colors[id] == null) {
+      // chọn shade ít người dùng nhất trong số thợ hiện có
+      var used = {};
+      Object.keys(state.colors).forEach(function (k) { used[state.colors[k]] = (used[state.colors[k]] || 0) + 1; });
+      var best = 0;
+      for (var i = 0; i < SHADES.length; i++) if ((used[i] || 0) < (used[best] || 0)) best = i;
+      state.colors[id] = best;
+    }
+    return SHADES[state.colors[id] % SHADES.length];
+  }
+  // Ghi nhớ tên mọi thợ đang có (để nhật ký vẫn đọc được sau khi xoá thợ khỏi danh sách)
+  function rememberNames() {
+    if (!state.names) state.names = {};
+    state.techs.forEach(function (t) { state.names[t.id] = t.name; });
   }
   function swatch(id, extraClass) {
     var s = el('span', { class: 'swatch' + (extraClass ? ' ' + extraClass : ''), 'aria-hidden': 'true' });
@@ -65,29 +80,45 @@
   }
 
   // ── Lưu / nạp ─────────────────────────────────────────
-  function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+  function save() { rememberNames(); localStorage.setItem(KEY, JSON.stringify(state)); }
+  // Chuẩn hoá state từ bất kỳ nguồn nào (localStorage cũ, file JSON nạp vào) → không thiếu trường nào.
+  function normalize(s) {
+    if (!s || typeof s !== 'object' || !Array.isArray(s.techs)) throw new Error('Dữ liệu không đúng định dạng (thiếu danh sách thợ)');
+    var base = L.createState();
+    var out = Object.assign({}, base, s);
+    out.date = typeof s.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.date) ? s.date : base.date;
+    out.log = Array.isArray(s.log) ? s.log.filter(function (e) { return e && Array.isArray(e.techIds); }) : [];
+    out.settings = Object.assign({}, L.DEFAULT_SETTINGS, s.settings || {});
+    if (!Array.isArray(out.settings.services)) out.settings.services = L.DEFAULT_SERVICES;
+    out.history = Array.isArray(s.history) ? s.history : [];
+    out.techs = s.techs.filter(function (t) { return t && t.id != null && t.name; }).map(function (t) {
+      return Object.assign({ points: 0, status: 'active', joinedAt: Date.now(), lastServedAt: null, jobs: [] }, t, {
+        points: Number(t.points) || 0,
+        jobs: Array.isArray(t.jobs) ? t.jobs : [],
+      });
+    });
+    out.colors = (s.colors && typeof s.colors === 'object') ? s.colors : {};
+    out.names = (s.names && typeof s.names === 'object') ? s.names : {};
+    return out;
+  }
   function load() {
     try {
       var raw = localStorage.getItem(KEY);
-      if (raw) {
-        var s = JSON.parse(raw);
-        if (s && Array.isArray(s.techs)) {
-          s.settings = Object.assign({}, L.DEFAULT_SETTINGS, s.settings || {});
-          s.history = s.history || [];
-          return s;
-        }
-      }
+      if (raw) return normalize(JSON.parse(raw));
     } catch (e) { console.warn('Không đọc được dữ liệu cũ', e); }
     return L.createState();
   }
-  // Mọi thay đổi đi qua đây: áp hành động → lưu → vẽ lại.
+  // Mọi thay đổi đi qua đây: áp hành động → vẽ lại → lưu (vẽ lỗi thì KHÔNG lưu, giữ state cũ).
   function apply(fn, okMsg) {
+    var prev = state;
     try {
       state = fn(state);
-      save();
       render();
+      save();
       if (okMsg) toast(okMsg);
     } catch (e) {
+      state = prev;
+      try { render(); } catch (e2) { /* giữ nguyên màn hình cũ */ }
       alert(e.message || String(e));
     }
   }
@@ -575,7 +606,12 @@
             renderSettingsRoster();
           } }),
           el('button', { type: 'button', class: 'btn ghost', text: 'Xoá', onclick: function () {
-            if (!confirm('Xoá hẳn ' + t.name + ' khỏi danh sách? (có thể Hoàn tác)')) return;
+            if (L.isBusy(t)) { alert(t.name + ' đang làm khách — bấm Xong trước rồi mới xoá.'); return; }
+            var hasToday = state.log.some(function (e) { return e.techIds.indexOf(t.id) >= 0; });
+            var msg = hasToday
+              ? t.name + ' có hoạt động trong nhật ký hôm nay. Xoá khỏi danh sách thợ? (nhật ký vẫn giữ tên; muốn thợ chỉ nghỉ hôm nay thì dùng nút Về thay vì xoá)'
+              : 'Xoá hẳn ' + t.name + ' khỏi danh sách? (có thể Hoàn tác)';
+            if (!confirm(msg)) return;
             apply(function (s) { return L.removeTech(s, { techId: t.id }); });
             renderSettingsRoster();
           } }),
@@ -594,10 +630,9 @@
     var r = new FileReader();
     r.onload = function () {
       try {
-        var s = JSON.parse(r.result);
-        if (!s || !Array.isArray(s.techs)) throw new Error('File không đúng định dạng');
-        if (!confirm('Thay toàn bộ dữ liệu hiện tại bằng file này?')) return;
-        state = s; state.history = state.history || []; save(); render(); toast('Đã nạp dữ liệu');
+        var imported = normalize(JSON.parse(r.result)); // ném lỗi nếu file hỏng → không đụng state
+        if (!confirm('Thay toàn bộ dữ liệu hiện tại bằng file này? (' + imported.techs.length + ' thợ, ngày ' + imported.date + ')')) return;
+        apply(function () { return imported; }, 'Đã nạp dữ liệu');
         $('#dlg-settings').close();
       } catch (e) { alert(e.message); }
     };
