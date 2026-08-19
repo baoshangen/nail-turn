@@ -93,13 +93,29 @@
   function activeTechs(state) {
     return state.techs.filter(function (t) { return t.status === 'active'; });
   }
+  /*
+   * Job của thợ: { id: ticket, service, weight, note, startedAt, pending, after }
+   *   - ticket: chung cho mọi phần của CÙNG 1 khách (khách 2 dịch vụ / 2 thợ)
+   *   - pending=true: thợ đang GIỮ khách này, chưa làm (làm sau khi thợ `after` xong) → vẫn ở hàng chờ
+   *   - pending=false: đang làm thật, đồng hồ chạy từ startedAt → bận, rời hàng chờ
+   */
   function jobsOf(t) { return t.jobs || []; }
-  function isBusy(t) { return jobsOf(t).length > 0; }
-  // Thợ đang làm khách (có ít nhất 1 job), theo thứ tự bắt đầu sớm nhất.
+  function activeJobs(t) { return jobsOf(t).filter(function (j) { return !j.pending; }); }
+  function pendingJobs(t) { return jobsOf(t).filter(function (j) { return j.pending; }); }
+  function isBusy(t) { return activeJobs(t).length > 0; }
+  // Thợ đang làm khách (có ít nhất 1 job đang chạy), theo thứ tự bắt đầu sớm nhất.
   function working(state) {
     return activeTechs(state).filter(isBusy).slice().sort(function (a, b) {
-      return jobsOf(a)[0].startedAt - jobsOf(b)[0].startedAt;
+      return activeJobs(a)[0].startedAt - activeJobs(b)[0].startedAt;
     });
+  }
+  // Các phần "làm sau" của cùng 1 khách (ticket) đang chờ — dùng để hỏi "Bắt đầu phần kế?" khi phần trước xong.
+  function pendingForTicket(state, ticket) {
+    var out = [];
+    state.techs.forEach(function (t) {
+      pendingJobs(t).forEach(function (j) { if (j.id === ticket) out.push({ tech: t, job: j }); });
+    });
+    return out;
   }
 
   function minActivePoints(state) {
@@ -183,26 +199,77 @@
    */
   function assign(state, opts) {
     var now = opts.now != null ? opts.now : Date.now();
-    var ids = opts.techIds || (opts.techId ? [opts.techId] : []);
-    if (!ids.length) throw new Error('Chưa chọn thợ');
-    return commit(state, function (s) {
-      var perTech = {};
-      var jobId = 'j' + now.toString(36) + Math.random().toString(36).slice(2, 6);
-      ids.forEach(function (id) {
-        var t = findTech(s, id);
-        if (!t) throw new Error('Không thấy thợ ' + id);
+    // Chuẩn hoá về dạng parts: [{techId, weight, service, later}]
+    var parts;
+    if (Array.isArray(opts.parts) && opts.parts.length) {
+      parts = opts.parts.map(function (p) { return { techId: p.techId, weight: p.weight, service: p.service || opts.service || '', later: !!p.later }; });
+    } else {
+      var ids = opts.techIds || (opts.techId ? [opts.techId] : []);
+      parts = ids.map(function (id) {
         var w;
         if (typeof opts.weight === 'number') w = opts.weight;
         else if (opts.weight && typeof opts.weight === 'object') w = Number(opts.weight[id]);
         else w = 1;
-        if (!(w >= 0)) throw new Error('Trọng số không hợp lệ');
-        t.points = round2(t.points + w);
-        t.lastServedAt = now;
-        perTech[id] = w;
-        if (!t.jobs) t.jobs = [];
-        t.jobs.push({ id: jobId, service: opts.service || '', startedAt: now, weight: w, note: opts.note || '' });
+        return { techId: id, weight: w, service: opts.service || '', later: false };
       });
-      addLog(s, { t: now, type: 'assign', techIds: ids.slice(), weight: perTech, note: opts.note || '', service: opts.service || '', jobId: jobId });
+    }
+    if (!parts.length) throw new Error('Chưa chọn thợ');
+    if (parts.every(function (p) { return p.later; })) throw new Error('Phải có ít nhất 1 phần làm ngay');
+    var nowIds = parts.filter(function (p) { return !p.later; }).map(function (p) { return p.techId; });
+    return commit(state, function (s) {
+      var perTech = {};
+      var ticket = 'j' + now.toString(36) + Math.random().toString(36).slice(2, 6);
+      parts.forEach(function (p) {
+        var t = findTech(s, p.techId);
+        if (!t) throw new Error('Không thấy thợ ' + p.techId);
+        var w = Number(p.weight);
+        if (!(w >= 0)) throw new Error('Trọng số không hợp lệ');
+        t.points = round2(t.points + w);          // turn tính NGAY lúc khách vào (kể cả phần làm sau)
+        t.lastServedAt = now;
+        perTech[p.techId] = round2((perTech[p.techId] || 0) + w);
+        if (!t.jobs) t.jobs = [];
+        t.jobs.push({
+          id: ticket, service: p.service || '', weight: w, note: opts.note || '',
+          startedAt: p.later ? null : now,
+          pending: !!p.later,
+          after: p.later ? nowIds.slice() : [],
+        });
+      });
+      addLog(s, {
+        t: now, type: 'assign',
+        techIds: parts.map(function (p) { return p.techId; }),
+        weight: perTech, note: opts.note || '',
+        service: parts[0].service || '', jobId: ticket,
+        parts: parts.map(function (p) { return { techId: p.techId, service: p.service || '', weight: p.weight, later: !!p.later }; }),
+      });
+    });
+  }
+
+  // Bắt đầu phần "làm sau" (thợ đang giữ khách ngồi vào làm) → job chạy, đồng hồ bắt đầu, thợ bận.
+  function startJob(state, opts) {
+    var now = opts.now != null ? opts.now : Date.now();
+    return commit(state, function (s) {
+      var t = findTech(s, opts.techId);
+      if (!t) throw new Error('Không thấy thợ');
+      var job = jobsOf(t).find(function (j) { return j.pending && (!opts.jobId || j.id === opts.jobId); });
+      if (!job) throw new Error(t.name + ' không có phần nào đang chờ');
+      job.pending = false;
+      job.startedAt = now;
+      addLog(s, { t: now, type: 'start', techIds: [t.id], weight: 0, note: '', service: job.service, jobId: job.id });
+    });
+  }
+
+  // Huỷ phần "làm sau" (khách đổi ý) → bỏ job, TRẢ LẠI turn đã tính.
+  function cancelPending(state, opts) {
+    var now = opts.now != null ? opts.now : Date.now();
+    return commit(state, function (s) {
+      var t = findTech(s, opts.techId);
+      if (!t) throw new Error('Không thấy thợ');
+      var idx = jobsOf(t).findIndex(function (j) { return j.pending && (!opts.jobId || j.id === opts.jobId); });
+      if (idx < 0) throw new Error(t.name + ' không có phần nào đang chờ');
+      var job = t.jobs.splice(idx, 1)[0];
+      t.points = Math.max(0, round2(t.points - (job.weight || 0)));
+      addLog(s, { t: now, type: 'cancel', techIds: [t.id], weight: -(job.weight || 0), note: '', service: job.service, jobId: job.id });
     });
   }
 
@@ -213,12 +280,8 @@
       var t = findTech(s, opts.techId);
       if (!t) throw new Error('Không thấy thợ');
       var jobs = t.jobs || [];
-      if (!jobs.length) throw new Error(t.name + ' không có khách đang làm');
-      var idx = 0;
-      if (opts.jobId) {
-        idx = jobs.findIndex(function (j) { return j.id === opts.jobId; });
-        if (idx < 0) throw new Error('Không thấy ca làm');
-      }
+      var idx = jobs.findIndex(function (j) { return !j.pending && (!opts.jobId || j.id === opts.jobId); });
+      if (idx < 0) throw new Error(t.name + ' không có khách đang làm');
       var job = jobs.splice(idx, 1)[0];
       var minutes = Math.max(0, Math.round((now - job.startedAt) / 60000));
       addLog(s, { t: now, type: 'finish', techIds: [t.id], weight: 0, note: '', service: job.service, minutes: minutes, jobId: job.id });
@@ -366,10 +429,15 @@
     working: working,
     isBusy: isBusy,
     jobsOf: jobsOf,
+    activeJobs: activeJobs,
+    pendingJobs: pendingJobs,
+    pendingForTicket: pendingForTicket,
     findTech: findTech,
     addTech: addTech,
     rejoin: rejoin,
     finish: finish,
+    startJob: startJob,
+    cancelPending: cancelPending,
     assign: assign,
     skip: skip,
     pause: pause,

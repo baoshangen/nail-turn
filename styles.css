@@ -255,6 +255,38 @@ h1 { white-space: nowrap; }
 }
 .queue-empty b { color: var(--ink); }
 
+/* Phần thêm cho cùng khách (popup Nhận khách) */
+.parts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.part-row {
+  display: grid; grid-template-columns: 1.1fr 1.3fr 74px auto auto; gap: 6px; align-items: center;
+  padding: 8px; border-radius: 12px; border: 1px solid var(--hair); background: var(--paper);
+}
+.part-row.later { border-color: var(--gold); background: var(--gold-soft); }
+.part-row .input { padding: 7px 8px; font-size: 13px; }
+.seg2 { display: inline-flex; border: 1px solid var(--hair-2); border-radius: 999px; overflow: hidden; }
+.seg2-btn { font: inherit; font-size: 12px; font-weight: 600; padding: 6px 10px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer; }
+.seg2-btn.on { background: var(--ink); color: var(--paper); }
+.tiny { font-size: 12px; margin-top: 8px; line-height: 1.5; }
+.start-row { grid-template-columns: 1fr auto; }
+.start-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 720px) { .part-row { grid-template-columns: 1fr 1fr; } .part-row .seg2 { grid-column: 1 / -1; justify-self: start; } }
+
+/* Dải "đang giữ khách" trên thẻ thợ */
+.pending { display: flex; flex-direction: column; gap: 6px; }
+.pending-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  padding: 8px 10px; border-radius: 12px; border: 1px dashed var(--gold); background: var(--gold-soft);
+}
+.pending-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pending-tag { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
+.pending-svc { font-weight: 600; font-size: 13px; }
+.pending-after { font-size: 12px; color: var(--ink-2); }
+.pending-ops { display: flex; gap: 4px; }
+.pending-ops .btn { padding: 6px 10px; font-size: 12px; }
+.log .w.later { background: var(--gold-soft); color: var(--ink); }
+.log li.start .tag { color: var(--sage); }
+.log li.cancel .tag { color: var(--gold); }
+
 /* Khu "Đang làm khách" */
 .working { margin-top: 32px; }
 .card.busy { background: var(--glass-strong); border-color: var(--sage-soft); }

@@ -97,12 +97,10 @@
       <input type="number" id="weight-custom" class="input hidden" step="0.25" min="0" placeholder="vd 1.5">
     </div>
     <div class="field">
-      <label>Làm chung với ai? <span class="muted">(bỏ trống nếu làm 1 mình)</span></label>
-      <div id="coworkers" class="chips"></div>
-    </div>
-    <div id="split-wrap" class="field hidden">
-      <label>Chia turn từng người</label>
-      <div id="split-rows" class="split"></div>
+      <label>Khách này có thợ khác làm cùng / làm phần khác không? <span class="muted">(bỏ trống nếu 1 thợ làm hết)</span></label>
+      <div id="parts" class="parts"></div>
+      <button type="button" class="btn ghost" id="btn-add-part">＋ Thêm thợ khác cho khách này</button>
+      <p class="muted tiny">Ví dụ: chân làm trước → chọn thợ tay, chọn <b>Làm sau</b> → thợ tay <b>giữ khách</b>, vẫn ở hàng chờ, tới lúc chân xong app sẽ hỏi bắt đầu tay. Hai người làm chung 1 dịch vụ chia đôi thì mỗi người ½ và <b>Cùng lúc</b>.</p>
     </div>
     <div class="field">
       <label>Ghi chú <span class="muted">(tuỳ chọn)</span></label>
@@ -113,6 +111,17 @@
       <button type="submit" class="btn primary">Xác nhận</button>
     </div>
   </form>
+</dialog>
+
+<!-- Modal: Bắt đầu phần làm sau (hiện khi phần trước của cùng khách vừa xong) -->
+<dialog id="dlg-start" class="modal">
+  <div>
+    <h3>Khách này còn phần làm sau</h3>
+    <div id="start-list" class="parts"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>Để sau</button>
+    </div>
+  </div>
 </dialog>
 
 <!-- Modal: Sửa điểm -->
