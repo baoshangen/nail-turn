@@ -108,11 +108,18 @@
     var qc = $('#queue'); qc.innerHTML = '';
     q.forEach(function (t, i) { qc.appendChild(card(t, i, i === 0)); });
 
+    var w = L.working(state);
+    var wc = $('#working'); wc.innerHTML = '';
+    w.forEach(function (t) { wc.appendChild(workingCard(t)); });
+    $('#working-count').textContent = w.length;
+    $('#working-wrap').classList.toggle('hidden', w.length === 0);
+
     var bc = $('#bench'); bc.innerHTML = '';
     bench.forEach(function (t) { bc.appendChild(card(t, null, false)); });
     $('#bench-wrap').classList.toggle('hidden', bench.length === 0);
     $('#empty').classList.toggle('hidden', anyToday);
     $('#queue').classList.toggle('hidden', !anyToday);
+    $('#queue-empty').classList.toggle('hidden', !(anyToday && q.length === 0));
 
     if (window.FX && !firstRender) FX.play(board); // FLIP: trượt sang chỗ mới
     if (firstRender) {
@@ -163,12 +170,62 @@
     ]);
   }
 
+  // Thẻ thợ ĐANG LÀM KHÁCH: dịch vụ + đồng hồ đếm + nút Xong (mỗi khách 1 nút) + Nhận thêm
+  function fmtDur(ms) {
+    var m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+    if (m >= 60) return Math.floor(m / 60) + 'g' + String(m % 60).padStart(2, '0') + 'p';
+    return m + ':' + String(s).padStart(2, '0');
+  }
+  function workingCard(t) {
+    var jobs = L.jobsOf(t);
+    var jobRows = jobs.map(function (j) {
+      var timer = el('b', { class: 'timer mono', text: fmtDur(Date.now() - j.startedAt), dataset: { start: j.startedAt } });
+      return el('div', { class: 'job' }, [
+        el('div', { class: 'job-info' }, [
+          el('span', { class: 'job-service', text: j.service || 'Khách' }),
+          el('span', { class: 'job-meta' }, [
+            el('span', { text: 'từ ' + fmtTime(j.startedAt) + ' · ' }),
+            timer,
+            el('span', { class: 'w', text: fmtPts(j.weight) + ' turn' }),
+          ]),
+          j.note ? el('span', { class: 'job-note', text: j.note }) : null,
+        ]),
+        el('button', { class: 'btn primary done', text: 'Xong', title: 'Làm xong khách này', onclick: function () {
+          apply(function (s) { return L.finish(s, { techId: t.id, jobId: j.id }); }, t.name + ' xong khách' + (j.service ? ' — ' + j.service : ''));
+        } }),
+      ]);
+    });
+    return el('div', { class: 'card busy', dataset: { id: t.id } }, [
+      el('div', { class: 'card-top' }, [
+        el('span', { class: 'live-dot', 'aria-hidden': 'true' }),
+        el('span', { class: 'badge busy', text: jobs.length > 1 ? 'Đang làm ' + jobs.length + ' khách' : 'Đang làm' }),
+      ]),
+      el('div', { class: 'card-name' }, [swatch(t.id), el('span', { text: t.name })]),
+      el('div', { class: 'jobs' }, jobRows),
+      el('div', { class: 'card-points small' }, [el('b', { text: fmtPts(t.points) }), el('span', { text: 'turn hôm nay' })]),
+      el('div', { class: 'card-actions' }, [
+        el('button', { class: 'btn ghost', text: '＋ Nhận thêm', title: 'Nhận thêm 1 khách nữa dù đang làm', onclick: function () { openAssign(t.id); } }),
+        el('button', { class: 'btn subtle', text: '± điểm', onclick: function () { openAdjust(t.id); } }),
+      ]),
+    ]);
+  }
+  // Đồng hồ: chỉ cập nhật chữ trong .timer mỗi giây, không vẽ lại cả bảng
+  setInterval(function () {
+    var now = Date.now();
+    $$('.timer[data-start]').forEach(function (b) { b.textContent = fmtDur(now - Number(b.dataset.start)); });
+  }, 1000);
+
   function describe(e) {
     var names = e.techIds.map(nameOf).join(' + ');
     switch (e.type) {
       case 'assign': {
         var ws = e.techIds.map(function (id) { return fmtPts(e.weight[id]); }).join(' / ');
-        return [swatch(e.techIds[0]), el('span', { class: 'tag', text: names + ' nhận khách' }), el('span', { class: 'w', text: ws + ' turn' }), e.note ? el('span', { class: 'note', text: ' — ' + e.note }) : null];
+        var label = names + ' nhận khách' + (e.service ? ' · ' + e.service : '');
+        return [swatch(e.techIds[0]), el('span', { class: 'tag', text: label }), el('span', { class: 'w', text: ws + ' turn' }), e.note ? el('span', { class: 'note', text: ' — ' + e.note }) : null];
+      }
+      case 'finish': {
+        var dur = e.minutes >= 60 ? Math.floor(e.minutes / 60) + 'g' + (e.minutes % 60 ? (e.minutes % 60) + 'p' : '') : e.minutes + ' phút';
+        return [swatch(e.techIds[0]), el('span', { class: 'tag', text: names + ' xong khách' + (e.service ? ' · ' + e.service : '') }), el('span', { class: 'w', text: dur })];
       }
       case 'skip': return [el('span', { class: 'tag', text: names + ' bỏ lượt' }), e.weight ? el('span', { class: 'w', text: '+1 turn' }) : null];
       case 'pause': return [el('span', { class: 'tag', text: names + ' tạm nghỉ' })];
@@ -182,7 +239,7 @@
   function renderLog() {
     var ol = $('#log'); ol.innerHTML = '';
     if (!state.log.length) { ol.appendChild(el('li', {}, [el('span', { class: 'log-empty', text: 'Chưa có gì hôm nay.' })])); return; }
-    state.log.slice().reverse().forEach(function (e) {
+    state.log.slice().sort(function (a, b) { return b.t - a.t; }).forEach(function (e) {
       ol.appendChild(el('li', { class: e.type }, [el('time', { text: fmtTime(e.t) }), el('span', {}, describe(e))]));
     });
   }
@@ -222,14 +279,44 @@
     if (assignCtx.custom) return Number($('#weight-custom').value);
     return assignCtx.weight;
   }
+  // Chọn trọng số theo giá trị (khớp nút 1/½/0, còn lại → "Khác" + điền số)
+  function setWeight(w) {
+    var seg = $('#weight-seg');
+    var preset = [1, 0.5, 0].indexOf(w) >= 0;
+    assignCtx.custom = !preset;
+    if (preset) { assignCtx.weight = w; pickSeg(seg, w); $('#weight-custom').classList.add('hidden'); }
+    else { pickSeg(seg, 'custom'); $('#weight-custom').classList.remove('hidden'); $('#weight-custom').value = String(w); }
+    refreshSplit();
+  }
+  function renderServiceChips() {
+    var box = $('#services'); box.innerHTML = '';
+    var list = (state.settings.services || L.DEFAULT_SERVICES).slice();
+    list.forEach(function (svc) {
+      var chip = el('button', { type: 'button', class: 'chip svc' + (assignCtx.service === svc.name ? ' on' : '') }, [
+        el('span', { text: svc.name }), el('small', { text: fmtPts(svc.weight) }),
+      ]);
+      chip.addEventListener('click', function () {
+        assignCtx.service = svc.name;
+        setWeight(Number(svc.weight));
+        renderServiceChips();
+      });
+      box.appendChild(chip);
+    });
+    var other = el('button', { type: 'button', class: 'chip svc' + (assignCtx.service === '' ? ' on' : ''), text: 'Khác / không ghi' });
+    other.addEventListener('click', function () { assignCtx.service = ''; renderServiceChips(); $('#assign-note').focus(); });
+    box.appendChild(other);
+  }
   function openAssign(techId) {
-    assignCtx = { techId: techId, weight: 1, custom: false, coworkers: [] };
+    assignCtx = { techId: techId, weight: 1, custom: false, coworkers: [], service: '' };
+    var t = L.findTech(state, techId);
     $('#assign-name').textContent = nameOf(techId);
+    $('#assign-busy-note').classList.toggle('hidden', !L.isBusy(t));
     pickSeg($('#weight-seg'), 1);
     $('#weight-custom').classList.add('hidden'); $('#weight-custom').value = '';
     $('#assign-note').value = '';
+    renderServiceChips();
     var cw = $('#coworkers'); cw.innerHTML = '';
-    L.activeTechs(state).filter(function (t) { return t.id !== techId; }).forEach(function (t) {
+    L.activeTechs(state).filter(function (t2) { return t2.id !== techId; }).forEach(function (t) {
       var chip = el('button', { type: 'button', class: 'chip', text: t.name });
       chip.addEventListener('click', function () {
         var i = assignCtx.coworkers.indexOf(t.id);
@@ -271,7 +358,7 @@
     var bad = typeof weight === 'number' ? !(weight >= 0) : Object.keys(weight).some(function (k) { return !(weight[k] >= 0); });
     if (bad) { alert('Số turn không hợp lệ'); return; }
     var before = state;
-    apply(function (s) { return L.assign(s, { techIds: ids, weight: weight, note: note }); },
+    apply(function (s) { return L.assign(s, { techIds: ids, weight: weight, note: note, service: assignCtx.service || '' }); },
       ids.map(nameOf).join(' + ') + ' nhận khách');
     $('#dlg-assign').close();
     if (state !== before && window.FX) {
@@ -404,13 +491,13 @@
   $('#btn-summary').addEventListener('click', function () {
     var tb = $('#summary-table tbody'); tb.innerHTML = '';
     var rows = L.summary(state);
-    if (!rows.length) tb.appendChild(el('tr', {}, [el('td', { colspan: '5', class: 'muted', text: 'Chưa có dữ liệu.' })]));
-    var statusText = { active: 'Đang làm', paused: 'Tạm nghỉ', left: 'Đã về' };
+    if (!rows.length) tb.appendChild(el('tr', {}, [el('td', { colspan: '6', class: 'muted', text: 'Chưa có dữ liệu.' })]));
+    var statusText = { active: 'Trong ca', paused: 'Tạm nghỉ', left: 'Đã về' };
     rows.forEach(function (r) {
       tb.appendChild(el('tr', {}, [
         el('td', { text: r.name }), el('td', { class: 'num', text: String(r.customers) }),
-        el('td', { class: 'num', text: fmtPts(r.points) }), el('td', { class: 'num', text: String(r.skips) }),
-        el('td', { text: statusText[r.status] || r.status }),
+        el('td', { class: 'num', text: fmtPts(r.points) }), el('td', { class: 'num', text: String(r.skips) }), el('td', { class: 'num', text: r.minutes ? String(r.minutes) : '–' }),
+        el('td', { text: r.busy ? 'Đang làm khách' : (statusText[r.status] || r.status) }),
       ]));
     });
     $('#dlg-summary').showModal();
@@ -421,8 +508,53 @@
     $('#set-skipcosts').checked = !!state.settings.skipCosts;
     $('#set-latecatchup').checked = !!state.settings.lateCatchUp;
     renderSettingsRoster();
+    renderSettingsServices();
     $('#dlg-settings').showModal();
   });
+  function servicesList() { return (state.settings.services || L.DEFAULT_SERVICES).slice(); }
+  function saveServices(list) {
+    apply(function (s) { return L.updateSettings(s, { services: list }); });
+    renderSettingsServices();
+  }
+  function renderSettingsServices() {
+    var box = $('#settings-services'); box.innerHTML = '';
+    servicesList().forEach(function (svc, i, arr) {
+      var wInput = el('input', { class: 'input', type: 'number', step: '0.25', min: '0', value: String(svc.weight), title: 'Số turn', style: 'max-width:80px;padding:5px 8px' });
+      wInput.addEventListener('change', function () {
+        var v = Number(wInput.value); if (!(v >= 0)) { wInput.value = svc.weight; return; }
+        var list = servicesList(); list[i] = { name: svc.name, weight: v }; saveServices(list);
+      });
+      box.appendChild(el('div', { class: 'roster-row' }, [
+        el('span', { class: 'muted', text: '•' }),
+        el('span', { class: 'name', text: svc.name }),
+        el('div', { class: 'ops' }, [
+          wInput,
+          el('span', { class: 'muted', text: 'turn', style: 'align-self:center;font-size:12px' }),
+          el('button', { type: 'button', class: 'btn ghost', text: '▲', disabled: i === 0 ? 'true' : null, onclick: function () {
+            var list = servicesList(); var t = list[i - 1]; list[i - 1] = list[i]; list[i] = t; saveServices(list);
+          } }),
+          el('button', { type: 'button', class: 'btn ghost', text: '▼', disabled: i === arr.length - 1 ? 'true' : null, onclick: function () {
+            var list = servicesList(); var t = list[i + 1]; list[i + 1] = list[i]; list[i] = t; saveServices(list);
+          } }),
+          el('button', { type: 'button', class: 'btn ghost', text: 'Xoá', onclick: function () {
+            var list = servicesList(); list.splice(i, 1); saveServices(list);
+          } }),
+        ]),
+      ]));
+    });
+  }
+  function addService() {
+    var name = $('#svc-name').value.trim(); var w = Number($('#svc-weight').value);
+    if (!name) { $('#svc-name').focus(); return; }
+    if (!(w >= 0)) { alert('Số turn không hợp lệ'); return; }
+    var list = servicesList();
+    if (list.some(function (x) { return x.name.toLowerCase() === name.toLowerCase(); })) { alert('Đã có dịch vụ tên này'); return; }
+    list.push({ name: name, weight: w });
+    saveServices(list);
+    $('#svc-name').value = ''; $('#svc-weight').value = '1'; $('#svc-name').focus();
+  }
+  $('#svc-add').addEventListener('click', addService);
+  $('#svc-name').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); addService(); } });
   $('#set-skipcosts').addEventListener('change', function (ev) {
     apply(function (s) { return L.updateSettings(s, { skipCosts: ev.target.checked }); });
   });
@@ -512,12 +644,18 @@
     s = L.addTech(s, { name: 'Bé Vy', id: 'vy', now: now - 175 * m });
     s = L.addTech(s, { name: 'Anh Tuấn', id: 'tuan', now: now - 170 * m });
     s = L.addTech(s, { name: 'Chị Hoa', id: 'hoa', now: now - 160 * m });
-    s = L.assign(s, { techId: 'lan', weight: 1, now: now - 150 * m, note: 'full set gel' });
-    s = L.assign(s, { techId: 'vy', weight: 0.5, now: now - 140 * m, note: 'đổi nước sơn' });
-    s = L.assign(s, { techId: 'tuan', weight: 1, now: now - 130 * m, note: 'pedicure' });
-    s = L.assign(s, { techId: 'hoa', weight: 1, now: now - 120 * m, note: 'khách request' });
+    s = L.assign(s, { techId: 'lan', weight: 1, service: 'Full set', now: now - 150 * m, note: 'gel' });
+    s = L.assign(s, { techId: 'vy', weight: 0.5, service: 'Đổi nước sơn', now: now - 140 * m });
+    s = L.finish(s, { techId: 'vy', now: now - 125 * m });
+    s = L.assign(s, { techId: 'tuan', weight: 1, service: 'Pedicure', now: now - 130 * m });
+    s = L.finish(s, { techId: 'lan', now: now - 95 * m });
+    s = L.assign(s, { techId: 'hoa', weight: 1, service: 'Gel', now: now - 120 * m, note: 'khách request' });
+    s = L.finish(s, { techId: 'tuan', now: now - 80 * m });
     s = L.skip(s, { techId: 'vy', now: now - 100 * m });
-    s = L.assign(s, { techIds: ['vy', 'lan'], weight: { vy: 0.5, lan: 0.5 }, now: now - 90 * m, note: 'làm chung tay + chân' });
+    s = L.assign(s, { techIds: ['vy', 'lan'], weight: { vy: 0.5, lan: 0.5 }, service: 'Mani + Pedi', now: now - 90 * m, note: 'làm chung tay + chân' });
+    s = L.finish(s, { techId: 'vy', now: now - 50 * m });
+    s = L.finish(s, { techId: 'lan', now: now - 45 * m });
+    s = L.assign(s, { techId: 'vy', weight: 1, service: 'Fill', now: now - 23 * m });
     s = L.pause(s, { techId: 'tuan', now: now - 30 * m });
     s.history = [];
     state = s;

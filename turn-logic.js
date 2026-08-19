@@ -17,9 +17,21 @@
 
   var HISTORY_LIMIT = 20;
 
+  // Danh sách dịch vụ mặc định + số turn tương ứng (Ray sửa được trong Cài đặt).
+  var DEFAULT_SERVICES = [
+    { name: 'Full set', weight: 1 },
+    { name: 'Fill', weight: 1 },
+    { name: 'Gel', weight: 1 },
+    { name: 'Pedicure', weight: 1 },
+    { name: 'Mani + Pedi', weight: 1 },
+    { name: 'Mani thường', weight: 0.5 },
+    { name: 'Đổi nước sơn', weight: 0.5 },
+    { name: 'Design', weight: 1 },
+  ];
   var DEFAULT_SETTINGS = {
     skipCosts: false,   // Skip = mất lượt (+1 turn)?
     lateCatchUp: true,  // Thợ vào trễ khởi đầu = điểm thấp nhất hiện tại?
+    services: DEFAULT_SERVICES,
   };
 
   function clone(obj) {
@@ -77,8 +89,17 @@
     return null;
   }
 
+  // Thợ trong ca (active) — gồm cả rảnh lẫn đang làm khách.
   function activeTechs(state) {
     return state.techs.filter(function (t) { return t.status === 'active'; });
+  }
+  function jobsOf(t) { return t.jobs || []; }
+  function isBusy(t) { return jobsOf(t).length > 0; }
+  // Thợ đang làm khách (có ít nhất 1 job), theo thứ tự bắt đầu sớm nhất.
+  function working(state) {
+    return activeTechs(state).filter(isBusy).slice().sort(function (a, b) {
+      return jobsOf(a)[0].startedAt - jobsOf(b)[0].startedAt;
+    });
   }
 
   function minActivePoints(state) {
@@ -103,8 +124,9 @@
     return a.joinedAt - b.joinedAt;
   }
 
+  // Hàng chờ = thợ trong ca VÀ đang rảnh (không có job). Thợ đang làm không thể là NEXT.
   function queue(state) {
-    return activeTechs(state).slice().sort(compareTechs);
+    return activeTechs(state).filter(function (t) { return !isBusy(t); }).sort(compareTechs);
   }
 
   function nextTech(state) {
@@ -154,13 +176,18 @@
     });
   }
 
-  // Giao khách. techIds: 1 hay nhiều thợ. weight: số (áp cho tất cả) hoặc {id: số}.
+  /*
+   * Giao khách. techIds: 1 hay nhiều thợ. weight: số (áp cho tất cả) hoặc {id: số}.
+   * service: tên dịch vụ (tuỳ chọn). Mỗi thợ được cộng điểm NGAY và nhận 1 job (đang làm) →
+   * rời hàng chờ cho tới khi bấm finish(). Thợ đang bận vẫn nhận thêm được (job thứ 2).
+   */
   function assign(state, opts) {
     var now = opts.now != null ? opts.now : Date.now();
     var ids = opts.techIds || (opts.techId ? [opts.techId] : []);
     if (!ids.length) throw new Error('Chưa chọn thợ');
     return commit(state, function (s) {
       var perTech = {};
+      var jobId = 'j' + now.toString(36) + Math.random().toString(36).slice(2, 6);
       ids.forEach(function (id) {
         var t = findTech(s, id);
         if (!t) throw new Error('Không thấy thợ ' + id);
@@ -172,8 +199,29 @@
         t.points = round2(t.points + w);
         t.lastServedAt = now;
         perTech[id] = w;
+        if (!t.jobs) t.jobs = [];
+        t.jobs.push({ id: jobId, service: opts.service || '', startedAt: now, weight: w, note: opts.note || '' });
       });
-      addLog(s, { t: now, type: 'assign', techIds: ids.slice(), weight: perTech, note: opts.note || '' });
+      addLog(s, { t: now, type: 'assign', techIds: ids.slice(), weight: perTech, note: opts.note || '', service: opts.service || '', jobId: jobId });
+    });
+  }
+
+  // Thợ làm xong khách → bỏ job (mặc định job cũ nhất; truyền jobId để chọn), quay lại hàng chờ.
+  function finish(state, opts) {
+    var now = opts.now != null ? opts.now : Date.now();
+    return commit(state, function (s) {
+      var t = findTech(s, opts.techId);
+      if (!t) throw new Error('Không thấy thợ');
+      var jobs = t.jobs || [];
+      if (!jobs.length) throw new Error(t.name + ' không có khách đang làm');
+      var idx = 0;
+      if (opts.jobId) {
+        idx = jobs.findIndex(function (j) { return j.id === opts.jobId; });
+        if (idx < 0) throw new Error('Không thấy ca làm');
+      }
+      var job = jobs.splice(idx, 1)[0];
+      var minutes = Math.max(0, Math.round((now - job.startedAt) / 60000));
+      addLog(s, { t: now, type: 'finish', techIds: [t.id], weight: 0, note: '', service: job.service, minutes: minutes, jobId: job.id });
     });
   }
 
@@ -263,6 +311,7 @@
     next.techs.forEach(function (t) {
       t.points = 0;
       t.lastServedAt = null;
+      t.jobs = [];
       var idx = working.indexOf(t.id);
       if (idx >= 0) {
         t.status = 'active';
@@ -288,13 +337,14 @@
     return state.techs
       .filter(function (t) { return t.status !== 'off'; })
       .map(function (t) {
-        var customers = 0, skips = 0;
+        var customers = 0, skips = 0, minutes = 0;
         state.log.forEach(function (e) {
           if (e.techIds.indexOf(t.id) < 0) return;
           if (e.type === 'assign') customers += 1;
           if (e.type === 'skip') skips += 1;
+          if (e.type === 'finish') minutes += e.minutes || 0;
         });
-        return { id: t.id, name: t.name, points: t.points, customers: customers, skips: skips, status: t.status };
+        return { id: t.id, name: t.name, points: t.points, customers: customers, skips: skips, minutes: minutes, busy: isBusy(t), status: t.status };
       })
       .sort(function (a, b) { return b.points - a.points; });
   }
@@ -305,6 +355,7 @@
 
   var TurnLogic = {
     DEFAULT_SETTINGS: DEFAULT_SETTINGS,
+    DEFAULT_SERVICES: DEFAULT_SERVICES,
     createState: createState,
     todayStr: todayStr,
     isNewDay: isNewDay,
@@ -312,9 +363,13 @@
     queue: queue,
     nextTech: nextTech,
     activeTechs: activeTechs,
+    working: working,
+    isBusy: isBusy,
+    jobsOf: jobsOf,
     findTech: findTech,
     addTech: addTech,
     rejoin: rejoin,
+    finish: finish,
     assign: assign,
     skip: skip,
     pause: pause,

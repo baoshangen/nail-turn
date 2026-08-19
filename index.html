@@ -41,6 +41,18 @@
       <p class="hint">Ai ít turn nhất đứng đầu · hoà thì ai làm khách lâu hơn đứng trước.</p>
     </div>
     <div id="queue" class="cards"></div>
+    <div id="queue-empty" class="queue-empty hidden">
+      <span class="live-dot" aria-hidden="true"></span>
+      Không ai rảnh — tất cả thợ đang làm khách. Khách mới thì chờ ai bấm <b>Xong</b> trước, hoặc <b>Nhận thêm</b> cho thợ đang bận.
+    </div>
+
+    <div id="working-wrap" class="working hidden">
+      <div class="section-head">
+        <h2>Đang làm khách <span id="working-count" class="pill"></span></h2>
+        <p class="hint">Bấm <b>Xong</b> khi thợ làm xong → tự về hàng chờ đúng chỗ theo điểm.</p>
+      </div>
+      <div id="working" class="cards"></div>
+    </div>
 
     <div id="bench-wrap" class="bench hidden">
       <div class="section-head">
@@ -67,8 +79,13 @@
 <dialog id="dlg-assign" class="modal">
   <form method="dialog" id="form-assign">
     <h3>Nhận khách — <span id="assign-name"></span></h3>
+    <p id="assign-busy-note" class="muted hidden">Thợ này đang làm khách — đây là <b>nhận thêm</b> (khách thứ 2).</p>
     <div class="field">
-      <label>Tính bao nhiêu turn?</label>
+      <label>Dịch vụ</label>
+      <div id="services" class="chips"></div>
+    </div>
+    <div class="field">
+      <label>Tính bao nhiêu turn? <span class="muted">(app tự điền theo dịch vụ, sửa được)</span></label>
       <div class="segmented" id="weight-seg">
         <button type="button" data-w="1" class="on">1 turn<small>full set, dịch vụ thường</small></button>
         <button type="button" data-w="0.5">½ turn<small>mani thường, đổi nước sơn</small></button>
@@ -162,7 +179,7 @@
   <div>
     <h3>Tổng kết hôm nay</h3>
     <table class="table" id="summary-table">
-      <thead><tr><th>Thợ</th><th>Khách</th><th>Turn</th><th>Skip</th><th>Trạng thái</th></tr></thead>
+      <thead><tr><th>Thợ</th><th>Khách</th><th>Turn</th><th>Skip</th><th>Phút làm</th><th>Trạng thái</th></tr></thead>
       <tbody></tbody>
     </table>
     <div class="modal-actions">
@@ -183,6 +200,15 @@
       <input type="checkbox" id="set-latecatchup">
       <span><b>Vào trễ = bắt kịp điểm</b><small>Bật: thợ vào trễ khởi đầu bằng điểm thấp nhất hiện tại (không cướp hết khách của người tới sớm). Tắt: khởi đầu 0.</small></span>
     </label>
+    <div class="field">
+      <label>Dịch vụ &amp; số turn <span class="muted">(hiện thành nút khi nhận khách)</span></label>
+      <div id="settings-services" class="roster"></div>
+      <div class="field row">
+        <input type="text" id="svc-name" class="input" placeholder="Tên dịch vụ mới" autocomplete="off">
+        <input type="number" id="svc-weight" class="input" step="0.25" min="0" value="1" style="max-width:90px" title="Số turn">
+        <button type="button" class="btn ghost" id="svc-add">＋</button>
+      </div>
+    </div>
     <div class="field">
       <label>Danh sách thợ</label>
       <div id="settings-roster" class="roster"></div>
