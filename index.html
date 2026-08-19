@@ -3,23 +3,33 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>Bảng chấm turn</title>
 <link rel="stylesheet" href="fonts-embedded.css">
 <link rel="stylesheet" href="styles.css">
+<script>
+  // Áp theme sớm để không chớp trắng/đen khi tải
+  (function(){try{var t=localStorage.getItem('nail-turn-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+</script>
 </head>
 <body>
 
-<header class="topbar">
+<header class="topbar" id="topbar">
   <div class="brand">
-    <span class="brand-dot"></span>
-    <h1>Bảng chấm turn</h1>
-    <span id="today-label" class="today"></span>
+    <div id="hero3d" aria-hidden="true" title="Màu sơn = thợ đang tới lượt"></div>
+    <div class="brand-text">
+      <span class="eyebrow">Nail salon · hôm nay</span>
+      <h1>Bảng chấm turn</h1>
+      <span id="today-label" class="today"></span>
+    </div>
   </div>
   <div class="topbar-actions">
-    <button id="btn-undo" class="btn ghost" title="Hoàn tác hành động cuối">↶ Hoàn tác</button>
+    <div class="queue-stat" title="Số thợ đang trong hàng chờ"><b id="queue-count">0</b><span>thợ trong hàng</span></div>
+    <button id="btn-undo" class="btn ghost" title="Hoàn tác hành động cuối (Ctrl+Z)">↶ Hoàn tác</button>
     <button id="btn-add" class="btn ghost">＋ Thêm thợ</button>
     <button id="btn-summary" class="btn ghost">Tổng kết</button>
-    <button id="btn-settings" class="btn ghost" title="Cài đặt">⚙</button>
+    <button id="btn-theme" class="btn ghost icon" title="Sáng / tối" aria-label="Đổi chế độ sáng tối">🌙</button>
+    <button id="btn-settings" class="btn ghost icon" title="Cài đặt" aria-label="Cài đặt">⚙</button>
     <button id="btn-newday" class="btn primary">Ngày mới</button>
   </div>
 </header>
@@ -27,8 +37,8 @@
 <main class="layout">
   <section class="board">
     <div class="section-head">
-      <h2>Hàng chờ <span id="queue-count" class="pill"></span></h2>
-      <p class="hint">Ai ít turn nhất đứng đầu. Hoà thì ai làm khách lâu hơn đứng trước.</p>
+      <h2>Hàng chờ</h2>
+      <p class="hint">Ai ít turn nhất đứng đầu · hoà thì ai làm khách lâu hơn đứng trước.</p>
     </div>
     <div id="queue" class="cards"></div>
 
@@ -189,7 +199,12 @@
 </dialog>
 
 <div id="toast" class="toast hidden"></div>
+<canvas id="fx-canvas" aria-hidden="true"></canvas>
 
+<script src="vendor/three.min.js"></script>
+<script src="vendor/RoomEnvironment.js"></script>
+<script src="hero3d.js"></script>
+<script src="fx.js"></script>
 <script src="turn-logic.js"></script>
 <script src="app.js"></script>
 </body>

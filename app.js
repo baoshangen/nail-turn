@@ -39,6 +39,23 @@
     return days[d.getDay()] + ', ' + p[2] + '/' + p[1] + '/' + p[0];
   }
   function nameOf(id) { var t = L.findTech(state, id); return t ? t.name : '?'; }
+  // Mỗi thợ 1 màu sơn cố định (băm id → 1 trong 8 shade). Dùng cho chấm màu thẻ + chai 3D.
+  var SHADES = ['#B8707C', '#C4384D', '#E27C6A', '#7B4B7A', '#B48EA6', '#4F9A93', '#EBD9CC', '#6E1E2C'];
+  var DEFAULT_SHADE = '#B8707C';
+  function colorOf(id) {
+    if (!id) return DEFAULT_SHADE;
+    var h = 0;
+    for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    // tránh trùng màu giữa các thợ đang trong danh sách nếu có thể: xoay theo thứ tự xuất hiện
+    var idx = state.techs.findIndex(function (t) { return t.id === id; });
+    return SHADES[(idx >= 0 ? idx : h) % SHADES.length];
+  }
+  function swatch(id, extraClass) {
+    var s = el('span', { class: 'swatch' + (extraClass ? ' ' + extraClass : ''), 'aria-hidden': 'true' });
+    s.style.setProperty('--sw', colorOf(id));
+    return s;
+  }
+  var firstRender = true;
   var toastTimer;
   function toast(msg) {
     var t = $('#toast');
@@ -84,6 +101,9 @@
     var bench = state.techs.filter(function (t) { return t.status === 'paused' || t.status === 'left'; });
     var anyToday = state.techs.some(function (t) { return t.status !== 'off'; });
 
+    var board = $('.board');
+    if (window.FX) FX.snapshot(board);            // FLIP: nhớ vị trí cũ
+
     $('#queue-count').textContent = q.length;
     var qc = $('#queue'); qc.innerHTML = '';
     q.forEach(function (t, i) { qc.appendChild(card(t, i, i === 0)); });
@@ -93,6 +113,13 @@
     $('#bench-wrap').classList.toggle('hidden', bench.length === 0);
     $('#empty').classList.toggle('hidden', anyToday);
     $('#queue').classList.toggle('hidden', !anyToday);
+
+    if (window.FX && !firstRender) FX.play(board); // FLIP: trượt sang chỗ mới
+    if (firstRender) {
+      $$('.card', board).forEach(function (c, i) { c.classList.add('enter'); c.style.animationDelay = Math.min(i, 10) * 45 + 'ms'; });
+      firstRender = false;
+    }
+    if (window.Hero3D) Hero3D.setColor(q.length ? colorOf(q[0].id) : DEFAULT_SHADE);
 
     renderLog();
   }
@@ -129,7 +156,7 @@
         el('span', { class: 'rank', text: rank != null ? '#' + (rank + 1) : '' }),
         badge,
       ]),
-      el('div', { class: 'card-name', text: t.name }),
+      el('div', { class: 'card-name' }, [swatch(t.id), el('span', { text: t.name })]),
       el('div', { class: 'card-points' }, [el('b', { text: fmtPts(t.points) }), el('span', { text: 'turn' })]),
       el('div', { class: 'card-meta', text: meta }),
       el('div', { class: 'card-actions' }, actions),
@@ -141,7 +168,7 @@
     switch (e.type) {
       case 'assign': {
         var ws = e.techIds.map(function (id) { return fmtPts(e.weight[id]); }).join(' / ');
-        return [el('span', { class: 'tag', text: names + ' nhận khách' }), el('span', { class: 'w', text: ws + ' turn' }), e.note ? el('span', { class: 'note', text: ' — ' + e.note }) : null];
+        return [swatch(e.techIds[0]), el('span', { class: 'tag', text: names + ' nhận khách' }), el('span', { class: 'w', text: ws + ' turn' }), e.note ? el('span', { class: 'note', text: ' — ' + e.note }) : null];
       }
       case 'skip': return [el('span', { class: 'tag', text: names + ' bỏ lượt' }), e.weight ? el('span', { class: 'w', text: '+1 turn' }) : null];
       case 'pause': return [el('span', { class: 'tag', text: names + ' tạm nghỉ' })];
@@ -243,9 +270,18 @@
     var note = $('#assign-note').value.trim();
     var bad = typeof weight === 'number' ? !(weight >= 0) : Object.keys(weight).some(function (k) { return !(weight[k] >= 0); });
     if (bad) { alert('Số turn không hợp lệ'); return; }
+    var before = state;
     apply(function (s) { return L.assign(s, { techIds: ids, weight: weight, note: note }); },
       ids.map(nameOf).join(' + ') + ' nhận khách');
     $('#dlg-assign').close();
+    if (state !== before && window.FX) {
+      // Ăn mừng: glitter từ thẻ vừa nhận khách (đang trượt sang chỗ mới) + chai 3D lắc
+      ids.forEach(function (id, i) {
+        var cardEl = $('.card[data-id="' + id + '"]');
+        if (cardEl) setTimeout(function () { FX.burst(cardEl, { count: i === 0 ? 90 : 50 }); }, 40);
+      });
+      if (window.Hero3D) Hero3D.wiggle();
+    }
   });
 
   // ── Sửa điểm ──────────────────────────────────────────
@@ -448,8 +484,26 @@
     }
   });
 
+  // ── Theme + hiệu ứng + 3D ─────────────────────────────
+  function themeIcon(t) { $('#btn-theme').textContent = t === 'dark' ? '☀' : '🌙'; }
+  if (window.FX) {
+    var t0 = FX.theme.init();
+    themeIcon(t0);
+    $('#btn-theme').addEventListener('click', function () {
+      var t = FX.theme.toggle();
+      themeIcon(t);
+      if (window.Hero3D) Hero3D.setTheme(t);
+    });
+    FX.tilt($('.board'));
+  }
+
   // ── Khởi động ─────────────────────────────────────────
   state = load();
+  if (window.Hero3D) {
+    var q0 = L.queue(state);
+    Hero3D.mount($('#hero3d'), { color: q0.length ? colorOf(q0[0].id) : DEFAULT_SHADE, pointerZone: $('#topbar') });
+    Hero3D.setTheme(window.FX ? FX.theme.get() : 'light');
+  }
   // Mở với #demo khi chưa có thợ → nạp dữ liệu mẫu để xem thử (bấm "Ngày mới" là dọn sạch).
   if (state.techs.length === 0 && location.hash === '#demo') {
     var now = Date.now(), m = 60000;
