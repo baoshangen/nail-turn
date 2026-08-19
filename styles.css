@@ -281,8 +281,13 @@ h1 { white-space: nowrap; }
 .pending-tag { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--gold); }
 .pending-svc { font-weight: 600; font-size: 13px; }
 .pending-after { font-size: 12px; color: var(--ink-2); }
-.pending-ops { display: flex; gap: 4px; }
+.pending-ops { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
 .pending-ops .btn { padding: 6px 10px; font-size: 12px; }
+.select-switch {
+  width: auto; padding: 6px 8px; font-size: 12px; border-radius: 8px;
+  background: var(--paper); color: var(--ink-2); cursor: pointer;
+}
+.select-switch:hover { color: var(--ink); border-color: var(--rose); }
 .log .w.later { background: var(--gold-soft); color: var(--ink); }
 .log li.start .tag { color: var(--sage); }
 .log li.cancel .tag { color: var(--gold); }

@@ -273,6 +273,29 @@
     });
   }
 
+  /*
+   * Chuyển phần "làm sau" sang thợ khác (thợ giữ khách bị kẹt khách walk-in).
+   * Turn đi theo phần việc: người cũ TRẢ turn của phần đó, người mới CỘNG (vì turn tính lúc nhận).
+   */
+  function switchPending(state, opts) {
+    var now = opts.now != null ? opts.now : Date.now();
+    return commit(state, function (s) {
+      var from = findTech(s, opts.techId);
+      var to = findTech(s, opts.toTechId);
+      if (!from || !to) throw new Error('Không thấy thợ');
+      if (from.id === to.id) throw new Error('Chọn thợ khác');
+      var idx = jobsOf(from).findIndex(function (j) { return j.pending && (!opts.jobId || j.id === opts.jobId); });
+      if (idx < 0) throw new Error(from.name + ' không có phần nào đang chờ');
+      var job = from.jobs.splice(idx, 1)[0];
+      from.points = Math.max(0, round2(from.points - (job.weight || 0)));
+      to.points = round2(to.points + (job.weight || 0));
+      to.lastServedAt = now;
+      if (!to.jobs) to.jobs = [];
+      to.jobs.push(job);
+      addLog(s, { t: now, type: 'switch', techIds: [from.id, to.id], weight: job.weight || 0, note: opts.note || '', service: job.service, jobId: job.id });
+    });
+  }
+
   // Thợ làm xong khách → bỏ job (mặc định job cũ nhất; truyền jobId để chọn), quay lại hàng chờ.
   function finish(state, opts) {
     var now = opts.now != null ? opts.now : Date.now();
@@ -437,6 +460,7 @@
     rejoin: rejoin,
     finish: finish,
     startJob: startJob,
+    switchPending: switchPending,
     cancelPending: cancelPending,
     assign: assign,
     skip: skip,

@@ -268,6 +268,7 @@
       }
       case 'start': return [swatch(e.techIds[0]), el('span', { class: 'tag', text: names + ' bắt đầu' + (e.service ? ' · ' + e.service : '') })];
       case 'cancel': return [swatch(e.techIds[0]), el('span', { class: 'tag', text: names + ' huỷ phần chờ' + (e.service ? ' · ' + e.service : '') }), el('span', { class: 'w', text: fmtPts(Math.abs(e.weight)) + ' turn trả lại' })];
+      case 'switch': return [swatch(e.techIds[1]), el('span', { class: 'tag', text: nameOf(e.techIds[0]) + ' chuyển ' + (e.service || 'phần chờ') + ' → ' + nameOf(e.techIds[1]) }), el('span', { class: 'w', text: fmtPts(e.weight) + ' turn theo phần' })];
       case 'finish': {
         var dur = e.minutes >= 60 ? Math.floor(e.minutes / 60) + 'g' + (e.minutes % 60 ? (e.minutes % 60) + 'p' : '') : e.minutes + ' phút';
         return [swatch(e.techIds[0]), el('span', { class: 'tag', text: names + ' xong khách' + (e.service ? ' · ' + e.service : '') }), el('span', { class: 'w', text: dur })];
@@ -477,10 +478,29 @@
         ]),
         el('div', { class: 'pending-ops' }, [
           el('button', { class: 'btn ghost', text: 'Bắt đầu', onclick: function () { startPending(t.id, j.id); } }),
+          switchSelect(t, j),
           el('button', { class: 'btn subtle', text: 'Huỷ', onclick: function () { cancelPending(t.id, j.id, j.service); } }),
         ]),
       ]);
     }));
+  }
+  // Dropdown "Chuyển →": giao phần đang giữ cho thợ khác (thợ này kẹt khách walk-in). Turn đi theo phần việc.
+  function switchSelect(t, j) {
+    var others = L.activeTechs(state).filter(function (x) { return x.id !== t.id; });
+    if (!others.length) return null;
+    var sel = el('select', { class: 'input select-switch', title: 'Chuyển phần này cho thợ khác' });
+    sel.appendChild(el('option', { value: '', text: 'Chuyển →' }));
+    others.forEach(function (x) {
+      var busy = L.isBusy(x) ? ' (đang bận)' : '';
+      sel.appendChild(el('option', { value: x.id, text: x.name + busy }));
+    });
+    sel.addEventListener('change', function () {
+      var to = sel.value;
+      if (!to) return;
+      apply(function (s) { return L.switchPending(s, { techId: t.id, toTechId: to, jobId: j.id }); },
+        'Chuyển ' + (j.service || 'phần kế') + ' từ ' + t.name + ' sang ' + nameOf(to));
+    });
+    return sel;
   }
 
   // ── Sửa điểm ──────────────────────────────────────────
