@@ -1,0 +1,155 @@
+/* ============================================================
+   BẢN MẪU "MIDNIGHT" — style dope.security: nền đen gần tuyệt đối,
+   1 màu tím signal duy nhất, hairline thay bóng đổ, nhãn mục kiểu tem mono.
+   File này NẠP SAU styles.css và chỉ đè — xoá link là về bản hồng như cũ.
+   Font thay thế (đã nhúng sẵn, đủ dấu Việt):
+     Whyte Inktrap → Be Vietnam Pro · GrandSlang italic → Cormorant Garamond italic
+     Whyte Inktrap Mono → IBM Plex Mono
+   ============================================================ */
+
+:root, [data-theme="dark"] {
+  --bg-a: #090909;
+  --bg-b: #090909;
+  --bg-glow: transparent;
+  --paper: #101012;
+  --glass: rgba(247, 249, 250, .03);
+  --glass-strong: rgba(247, 249, 250, .055);
+  --ink: #f7f9fa;
+  --ink-2: #828384;
+  --ink-3: #6b6b6b;
+  --hair: rgba(247, 249, 250, .12);
+  --hair-2: rgba(247, 249, 250, .22);
+  --rose: #af50ff;            /* Signal Violet — tia sáng duy nhất */
+  --rose-deep: #c77dff;
+  --rose-soft: rgba(175, 80, 255, .14);
+  --gold: #e1bdff;            /* Lavender Mist — chữ nhấn an toàn trên nền đen */
+  --gold-soft: rgba(225, 189, 255, .12);
+  --sage: #f7f9fa;            /* hệ đơn sắc: "đang làm" nói bằng trắng, không xanh */
+  --sage-soft: rgba(247, 249, 250, .08);
+  --amber: #b9b9bb;
+  --amber-soft: rgba(130, 131, 132, .16);
+  --shadow: none;
+  --shadow-lift: none;
+  --radius: 19.2px;
+  color-scheme: dark;
+}
+
+/* Nền: void phẳng tuyệt đối — không gradient, không vignette */
+body { background: #090909; }
+
+/* Chữ ký hiệu: tiêu đề lớn = serif NGHIÊNG (vai GrandSlang) */
+h1, h3 { font-style: italic; font-weight: 500; letter-spacing: -.02em; }
+
+/* Nhãn mục = tem mono giãn cực rộng (S S L  I N S P E C T I O N) */
+h2 {
+  font-family: var(--mono);
+  font-size: 12px; font-weight: 600;
+  letter-spacing: .38em; text-indent: .38em;
+  color: #f0f0f0;
+}
+.pill { background: transparent; border: 1px solid var(--hair-2); color: var(--gold); }
+
+/* Nav kính mờ tím-xám đúng công thức frosted */
+.topbar {
+  background: rgba(51, 50, 72, .7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(107, 107, 107, .5);
+}
+.eyebrow { color: var(--gold); letter-spacing: .3em; font-family: var(--mono); font-weight: 600; }
+
+/* Nút: 2 bán kính duy nhất — control 8px, CTA pill */
+.btn { border-radius: 8px; box-shadow: none !important; }
+.btn:hover { box-shadow: none !important; }
+.btn.ghost { border-color: var(--hair-2); }
+.btn.ghost:hover { background: rgba(247, 249, 250, .08); border-color: var(--ink); color: var(--ink); }
+.btn.icon, .pending-ops .btn, .roster-row .ops .btn { border-radius: 6px; }
+/* Filled action: gần như màu nền — đường viền trắng làm hết việc */
+.btn.primary, [data-theme="dark"] .btn.primary {
+  background: #090909; border: 1px solid #f7f9fa; color: #f7f9fa;
+  filter: none;
+}
+.btn.primary:hover { background: #f7f9fa; color: #090909; filter: none; }
+/* MỘT chỗ được tô tím: CTA của thẻ NEXT */
+.card.next .card-actions .btn.primary {
+  background: #af50ff; border-color: transparent; color: #fff;
+  border-radius: 1584px;
+}
+.card.next .card-actions .btn.primary:hover { background: #c77dff; color: #090909; }
+/* Xong = trắng đặc trên đen (đơn sắc, không xanh) */
+.btn.done, [data-theme="dark"] .btn.done {
+  background: #f7f9fa; color: #090909; box-shadow: none; border-radius: 8px;
+}
+.btn.done:hover { background: #e1bdff; }
+
+/* Thẻ: phẳng, không bóng — hairline + khoảng thở tạo khối */
+.card {
+  background: rgba(247, 249, 250, .03);
+  border: 1px solid var(--hair);
+  box-shadow: none;
+}
+.card.busy { background: rgba(247, 249, 250, .04); border-color: var(--hair); }
+.card.paused, .card.left { background: transparent; }
+/* Thẻ NEXT = violet bloom duy nhất của trang */
+.card.next {
+  background: radial-gradient(130% 100% at 88% -12%, rgba(175, 80, 255, .32), transparent 58%), #0c0a0e;
+  border-color: rgba(175, 80, 255, .5);
+  box-shadow: none;
+}
+.badge { border-radius: 1584px; letter-spacing: .16em; }
+.badge.next { background: #af50ff; color: #fff; font-style: normal; }
+.badge.busy { font-style: normal; }
+.rank { color: var(--gold); }
+
+/* Đồng hồ & số liệu: mono lạnh */
+.job { background: rgba(247, 249, 250, .04); border-color: var(--hair); border-radius: 10.8px; }
+.job-meta .w, .log .w { background: transparent; border: 1px solid var(--hair-2); color: var(--gold); }
+
+/* Dải giữ khách: hairline lavender, không nền kem */
+.pending { border-color: rgba(225, 189, 255, .35); background: rgba(225, 189, 255, .05); }
+.pending-tag { color: var(--gold); letter-spacing: .3em; font-family: var(--mono); }
+.select-switch { background: #090909; }
+
+/* Hàng chờ trống */
+.queue-empty { background: transparent; border-color: var(--hair-2); }
+
+/* Nhật ký: chỉ hairline, giờ mono thép */
+.log { background: transparent; border-color: var(--hair); }
+.log li { border-color: var(--hair); }
+.log li.assign .tag { color: #f7f9fa; }
+.log li.finish .tag { color: var(--gold); }
+.log li.resume .tag, .log li.join .tag { color: var(--ink-2); }
+.log li.skip .tag { color: var(--amber); }
+
+/* Modal: tấm đen nổi bằng viền, backdrop tối đặc */
+.modal { background: #0c0b0d; border: 1px solid var(--hair-2); box-shadow: none; }
+.modal::backdrop { background: rgba(9, 9, 9, .78); backdrop-filter: blur(4px); }
+.input { background: rgba(247, 249, 250, .05); border-color: var(--hair-2); border-radius: 6px; }
+.input:focus { outline-color: var(--rose); }
+.segmented button { background: rgba(247, 249, 250, .04); border-color: var(--hair); border-radius: 8px; }
+.segmented button.on { background: rgba(175, 80, 255, .18); border-color: rgba(175, 80, 255, .6); color: #e1bdff; }
+.segmented button.on small { color: #e1bdff; }
+.chip { border-radius: 1584px; background: rgba(237, 195, 196, .05); border-color: transparent; padding: 8px 16px; }
+.chip:hover { border-color: var(--hair-2); }
+.chip.on { background: rgba(175, 80, 255, .2); color: #e1bdff; border-color: transparent; font-weight: 600; }
+.chip.svc small { color: var(--ink-3); }
+.chip.svc.on small { color: #e1bdff; }
+.roster-row { background: rgba(247, 249, 250, .03); border-color: var(--hair); border-radius: 8px; }
+.toggle { border-color: var(--hair); }
+.toast { background: #f7f9fa; color: #090909; box-shadow: none; border-radius: 1584px; }
+
+/* Chấm nhịp "đang làm" — trắng thay xanh */
+@keyframes live {
+  0% { box-shadow: 0 0 0 0 rgba(247, 249, 250, .5); }
+  100% { box-shadow: 0 0 0 10px rgba(247, 249, 250, 0); }
+}
+
+/* Chân trang toạ độ — chữ ký kiểu bưu thiếp */
+.coord {
+  max-width: 1200px; margin: 40px auto 0; padding: 18px 24px 26px;
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  border-top: 1px solid var(--hair);
+  font-family: var(--mono); font-size: 12px; letter-spacing: .14em;
+  color: var(--ink-2);
+}
+.coord b { color: #f0f0f0; font-weight: 600; }
