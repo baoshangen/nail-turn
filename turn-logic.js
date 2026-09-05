@@ -24,8 +24,8 @@
     { name: 'Gel', weight: 1 },
     { name: 'Pedicure', weight: 1 },
     { name: 'Mani + Pedi', weight: 1 },
-    { name: 'Mani thường', weight: 0.5 },
-    { name: 'Đổi nước sơn', weight: 0.5 },
+    { name: 'Regular mani', weight: 0.5 },
+    { name: 'Polish change', weight: 0.5 },
     { name: 'Design', weight: 1 },
   ];
   var DEFAULT_SETTINGS = {
@@ -56,6 +56,7 @@
       date: opts.date || todayStr(now),
       techs: [],
       log: [],
+      waiting: [],   // khách chờ CHƯA gán thợ: {wid, ticket, service, weight, note, createdAt}
       settings: Object.assign({}, DEFAULT_SETTINGS, opts.settings || {}),
       history: [],
     };
@@ -158,7 +159,7 @@
   function addTech(state, opts) {
     var now = opts.now != null ? opts.now : Date.now();
     var name = String(opts.name || '').trim();
-    if (!name) throw new Error('Tên thợ trống');
+    if (!name) throw new Error('Tech name is empty');
     return commit(state, function (s) {
       var pts = 0;
       if (s.settings.lateCatchUp && activeTechs(s).length > 0) pts = minActivePoints(s);
@@ -181,7 +182,7 @@
     var now = opts.now != null ? opts.now : Date.now();
     return commit(state, function (s) {
       var t = findTech(s, opts.techId);
-      if (!t) throw new Error('Không thấy thợ');
+      if (!t) throw new Error('Tech not found');
       var pts = 0;
       if (s.settings.lateCatchUp && activeTechs(s).length > 0) pts = minActivePoints(s);
       t.status = 'active';
@@ -213,17 +214,23 @@
         return { techId: id, weight: w, service: opts.service || '', later: false };
       });
     }
-    if (!parts.length) throw new Error('Chưa chọn thợ');
-    if (parts.every(function (p) { return p.later; })) throw new Error('Phải có ít nhất 1 phần làm ngay');
-    var nowIds = parts.filter(function (p) { return !p.later; }).map(function (p) { return p.techId; });
+    if (!parts.length) throw new Error('No tech selected');
+    // Phần techId=null = khách chờ (pending, chưa biết ai làm) — không tính là "làm ngay"
+    if (!parts.some(function (p) { return p.techId && !p.later; })) throw new Error('At least one part must start now');
+    var nowIds = parts.filter(function (p) { return p.techId && !p.later; }).map(function (p) { return p.techId; });
     return commit(state, function (s) {
       var perTech = {};
       var ticket = 'j' + now.toString(36) + Math.random().toString(36).slice(2, 6);
+      if (!s.waiting) s.waiting = [];
       parts.forEach(function (p) {
-        var t = findTech(s, p.techId);
-        if (!t) throw new Error('Không thấy thợ ' + p.techId);
         var w = Number(p.weight);
-        if (!(w >= 0)) throw new Error('Trọng số không hợp lệ');
+        if (!(w >= 0)) throw new Error('Invalid turn amount');
+        if (!p.techId) { // pending: vào hàng khách chờ, KHÔNG cộng điểm ai — điểm tính lúc thợ nhận
+          s.waiting.push({ wid: newId(), ticket: ticket, service: p.service || '', weight: w, note: opts.note || '', createdAt: now });
+          return;
+        }
+        var t = findTech(s, p.techId);
+        if (!t) throw new Error('Tech not found: ' + p.techId);
         t.points = round2(t.points + w);          // turn tính NGAY lúc khách vào (kể cả phần làm sau)
         t.lastServedAt = now;
         perTech[p.techId] = round2((perTech[p.techId] || 0) + w);
@@ -237,11 +244,69 @@
       });
       addLog(s, {
         t: now, type: 'assign',
-        techIds: parts.map(function (p) { return p.techId; }),
+        techIds: parts.filter(function (p) { return p.techId; }).map(function (p) { return p.techId; }),
         weight: perTech, note: opts.note || '',
         service: parts[0].service || '', jobId: ticket,
-        parts: parts.map(function (p) { return { techId: p.techId, service: p.service || '', weight: p.weight, later: !!p.later }; }),
+        parts: parts.map(function (p) { return { techId: p.techId || null, service: p.service || '', weight: p.weight, later: !!p.later }; }),
       });
+    });
+  }
+
+  // ── Khách chờ (pending, CHƯA gán thợ) ─────────────────
+  function waitingList(state) {
+    return (state.waiting || []).slice().sort(function (a, b) { return a.createdAt - b.createdAt; });
+  }
+
+  // Thêm khách chờ độc lập (walk-in vô ngồi đợi, chưa thợ nào rảnh).
+  function addWaiting(state, opts) {
+    var now = opts.now != null ? opts.now : Date.now();
+    var w = Number(opts.weight);
+    if (!(w >= 0)) throw new Error('Invalid turn amount');
+    return commit(state, function (s) {
+      if (!s.waiting) s.waiting = [];
+      var ticket = 'j' + now.toString(36) + Math.random().toString(36).slice(2, 6);
+      s.waiting.push({ wid: newId(), ticket: ticket, service: opts.service || '', weight: w, note: opts.note || '', createdAt: now });
+      addLog(s, { t: now, type: 'wait', techIds: [], weight: 0, note: opts.note || '', service: opts.service || '', jobId: ticket });
+    });
+  }
+
+  /*
+   * Thợ nhận khách chờ. ĐIỂM TÍNH LÚC NHẬN (không phải lúc tạo pending) →
+   * không phá luật công bằng khi có hẹn/walk-in chen vào giữa.
+   * start=true: ngồi làm ngay (bận). start=false: giữ khách, làm sau (vẫn ở hàng chờ).
+   */
+  function claimWaiting(state, opts) {
+    var now = opts.now != null ? opts.now : Date.now();
+    return commit(state, function (s) {
+      var list = s.waiting || [];
+      var idx = list.findIndex(function (x) { return x.wid === opts.wid; });
+      if (idx < 0) throw new Error('Waiting customer not found');
+      var t = findTech(s, opts.techId);
+      if (!t) throw new Error('Tech not found');
+      var item = list.splice(idx, 1)[0];
+      var w = Number(item.weight) || 0;
+      t.points = round2(t.points + w);
+      t.lastServedAt = now;
+      if (!t.jobs) t.jobs = [];
+      t.jobs.push({
+        id: item.ticket, service: item.service || '', weight: w, note: item.note || '',
+        startedAt: opts.start ? now : null,
+        pending: !opts.start,
+        after: [],
+      });
+      addLog(s, { t: now, type: 'claim', techIds: [t.id], weight: w, note: item.note || '', service: item.service || '', jobId: item.ticket, started: !!opts.start });
+    });
+  }
+
+  // Huỷ khách chờ (khách đổi ý/về) — chưa ai bị tính điểm nên không phải trả gì.
+  function cancelWaiting(state, opts) {
+    var now = opts.now != null ? opts.now : Date.now();
+    return commit(state, function (s) {
+      var list = s.waiting || [];
+      var idx = list.findIndex(function (x) { return x.wid === opts.wid; });
+      if (idx < 0) throw new Error('Waiting customer not found');
+      var item = list.splice(idx, 1)[0];
+      addLog(s, { t: now, type: 'unwait', techIds: [], weight: 0, note: item.note || '', service: item.service || '', jobId: item.ticket });
     });
   }
 
@@ -250,9 +315,9 @@
     var now = opts.now != null ? opts.now : Date.now();
     return commit(state, function (s) {
       var t = findTech(s, opts.techId);
-      if (!t) throw new Error('Không thấy thợ');
+      if (!t) throw new Error('Tech not found');
       var job = jobsOf(t).find(function (j) { return j.pending && (!opts.jobId || j.id === opts.jobId); });
-      if (!job) throw new Error(t.name + ' không có phần nào đang chờ');
+      if (!job) throw new Error(t.name + ' has no held customer');
       job.pending = false;
       job.startedAt = now;
       addLog(s, { t: now, type: 'start', techIds: [t.id], weight: 0, note: '', service: job.service, jobId: job.id });
@@ -264,9 +329,9 @@
     var now = opts.now != null ? opts.now : Date.now();
     return commit(state, function (s) {
       var t = findTech(s, opts.techId);
-      if (!t) throw new Error('Không thấy thợ');
+      if (!t) throw new Error('Tech not found');
       var idx = jobsOf(t).findIndex(function (j) { return j.pending && (!opts.jobId || j.id === opts.jobId); });
-      if (idx < 0) throw new Error(t.name + ' không có phần nào đang chờ');
+      if (idx < 0) throw new Error(t.name + ' has no held customer');
       var job = t.jobs.splice(idx, 1)[0];
       t.points = Math.max(0, round2(t.points - (job.weight || 0)));
       addLog(s, { t: now, type: 'cancel', techIds: [t.id], weight: -(job.weight || 0), note: '', service: job.service, jobId: job.id });
@@ -282,10 +347,10 @@
     return commit(state, function (s) {
       var from = findTech(s, opts.techId);
       var to = findTech(s, opts.toTechId);
-      if (!from || !to) throw new Error('Không thấy thợ');
-      if (from.id === to.id) throw new Error('Chọn thợ khác');
+      if (!from || !to) throw new Error('Tech not found');
+      if (from.id === to.id) throw new Error('Pick a different tech');
       var idx = jobsOf(from).findIndex(function (j) { return j.pending && (!opts.jobId || j.id === opts.jobId); });
-      if (idx < 0) throw new Error(from.name + ' không có phần nào đang chờ');
+      if (idx < 0) throw new Error(from.name + ' has no held customer');
       var job = from.jobs.splice(idx, 1)[0];
       from.points = Math.max(0, round2(from.points - (job.weight || 0)));
       to.points = round2(to.points + (job.weight || 0));
@@ -301,10 +366,10 @@
     var now = opts.now != null ? opts.now : Date.now();
     return commit(state, function (s) {
       var t = findTech(s, opts.techId);
-      if (!t) throw new Error('Không thấy thợ');
+      if (!t) throw new Error('Tech not found');
       var jobs = t.jobs || [];
       var idx = jobs.findIndex(function (j) { return !j.pending && (!opts.jobId || j.id === opts.jobId); });
-      if (idx < 0) throw new Error(t.name + ' không có khách đang làm');
+      if (idx < 0) throw new Error(t.name + ' has no customer in progress');
       var job = jobs.splice(idx, 1)[0];
       var minutes = Math.max(0, Math.round((now - job.startedAt) / 60000));
       addLog(s, { t: now, type: 'finish', techIds: [t.id], weight: 0, note: '', service: job.service, minutes: minutes, jobId: job.id });
@@ -316,7 +381,7 @@
     var now = opts.now != null ? opts.now : Date.now();
     return commit(state, function (s) {
       var t = findTech(s, opts.techId);
-      if (!t) throw new Error('Không thấy thợ');
+      if (!t) throw new Error('Tech not found');
       var w = 0;
       if (s.settings.skipCosts) {
         w = 1;
@@ -330,7 +395,7 @@
   function setStatus(state, techId, status, now, type) {
     return commit(state, function (s) {
       var t = findTech(s, techId);
-      if (!t) throw new Error('Không thấy thợ');
+      if (!t) throw new Error('Tech not found');
       t.status = status;
       addLog(s, { t: now, type: type, techIds: [t.id], weight: 0, note: '' });
     });
@@ -350,10 +415,10 @@
   function adjust(state, opts) {
     var now = opts.now != null ? opts.now : Date.now();
     var delta = Number(opts.delta);
-    if (!isFinite(delta) || delta === 0) throw new Error('Số điều chỉnh không hợp lệ');
+    if (!isFinite(delta) || delta === 0) throw new Error('Invalid adjustment');
     return commit(state, function (s) {
       var t = findTech(s, opts.techId);
-      if (!t) throw new Error('Không thấy thợ');
+      if (!t) throw new Error('Tech not found');
       t.points = Math.max(0, round2(t.points + delta));
       addLog(s, { t: now, type: 'adjust', techIds: [t.id], weight: delta, note: opts.note || '' });
     });
@@ -361,10 +426,10 @@
 
   function renameTech(state, opts) {
     var name = String(opts.name || '').trim();
-    if (!name) throw new Error('Tên thợ trống');
+    if (!name) throw new Error('Tech name is empty');
     return commit(state, function (s) {
       var t = findTech(s, opts.techId);
-      if (!t) throw new Error('Không thấy thợ');
+      if (!t) throw new Error('Tech not found');
       t.name = name;
     });
   }
@@ -394,6 +459,7 @@
     next.date = opts.date || todayStr(now);
     next.log = [];
     next.history = [];
+    next.waiting = [];
     next.techs.forEach(function (t) {
       t.points = 0;
       t.lastServedAt = null;
@@ -426,7 +492,7 @@
         var customers = 0, skips = 0, minutes = 0;
         state.log.forEach(function (e) {
           if (e.techIds.indexOf(t.id) < 0) return;
-          if (e.type === 'assign') customers += 1;
+          if (e.type === 'assign' || e.type === 'claim') customers += 1;
           if (e.type === 'skip') skips += 1;
           if (e.type === 'finish') minutes += e.minutes || 0;
         });
@@ -463,6 +529,10 @@
     switchPending: switchPending,
     cancelPending: cancelPending,
     assign: assign,
+    waitingList: waitingList,
+    addWaiting: addWaiting,
+    claimWaiting: claimWaiting,
+    cancelWaiting: cancelWaiting,
     skip: skip,
     pause: pause,
     resume: resume,
