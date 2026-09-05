@@ -424,6 +424,15 @@
     });
   }
 
+  // Đặt/xoá PIN clock-in của thợ. Hash tính ở tầng UI (app.js) — logic thuần chỉ giữ chuỗi.
+  function setPin(state, opts) {
+    return commit(state, function (s) {
+      var t = findTech(s, opts.techId);
+      if (!t) throw new Error('Tech not found');
+      t.pinHash = opts.pinHash || null;
+    });
+  }
+
   function renameTech(state, opts) {
     var name = String(opts.name || '').trim();
     if (!name) throw new Error('Tech name is empty');
@@ -538,6 +547,7 @@
     resume: resume,
     leave: leave,
     adjust: adjust,
+    setPin: setPin,
     renameTech: renameTech,
     removeTech: removeTech,
     updateSettings: updateSettings,

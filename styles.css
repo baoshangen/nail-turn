@@ -462,3 +462,41 @@ h1 { white-space: nowrap; }
   .job { padding: 8px 10px; }
   .btn.done { padding: 8px 14px; }
 }
+
+/* ── v7: Clock in (PIN + webcam) ─────────────────────── */
+.clock-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.clock-chip {
+  font: inherit; font-size: 17px; font-weight: 600; color: var(--ink);
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--glass-strong); border: 1px solid var(--hair-2); border-radius: 16px;
+  padding: 14px 22px; cursor: pointer; box-shadow: var(--shadow);
+  transition: transform .08s ease;
+}
+.clock-chip:active { transform: scale(.96); }
+.clock-chip .swatch { width: 14px; height: 14px; }
+
+.pin-modal form { max-width: 300px; }
+.pin-dots { display: flex; justify-content: center; gap: 14px; margin: 10px 0 2px; }
+.pin-dots span {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--hair-2); background: transparent;
+  transition: background .1s ease, border-color .1s ease;
+}
+.pin-dots span.full { background: var(--rose); border-color: var(--rose); }
+.pin-input { position: absolute; opacity: 0; pointer-events: none; height: 0; padding: 0; border: 0; }
+.numpad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.numpad button {
+  font: inherit; font-size: 20px; font-weight: 600; color: var(--ink);
+  background: var(--glass); border: 1px solid var(--hair); border-radius: 12px;
+  padding: 12px 0; cursor: pointer;
+  transition: transform .06s ease, background .12s ease;
+}
+.numpad button:active { transform: scale(.94); background: var(--rose-soft); }
+.numpad .np-ok { background: var(--rose); color: #fff; border-color: var(--rose); }
+.numpad .np-del { font-size: 17px; }
+.pin-error { color: #c23b4e; font-weight: 600; font-size: 13.5px; text-align: center; margin: 8px 0 0; }
+.pin-shake { animation: pin-shake .3s ease; }
+@keyframes pin-shake { 0%,100%{transform:none} 25%{transform:translateX(-7px)} 50%{transform:translateX(6px)} 75%{transform:translateX(-4px)} }
+
+.log-thumb { width: 28px; height: 28px; object-fit: cover; border-radius: 7px; cursor: zoom-in; vertical-align: middle; margin-left: 6px; border: 1px solid var(--hair-2); }
+.photo-modal img { max-width: min(78vw, 480px); border-radius: 12px; display: block; margin: 6px auto; }

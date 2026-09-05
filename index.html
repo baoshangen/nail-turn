@@ -38,6 +38,15 @@
 
 <main class="layout">
   <section class="board">
+    <!-- Thợ chưa vào ca — tap tên + PIN để clock in, thứ tự turn = thứ tự tới thật -->
+    <div id="clockin-wrap" class="clockin hidden">
+      <div class="section-head">
+        <h2>👋 Clock in</h2>
+        <p class="hint">Tap your name when you arrive — the turn order follows real arrival time.</p>
+      </div>
+      <div id="clockin" class="clock-chips"></div>
+    </div>
+
     <!-- Khách chờ chưa gán thợ -->
     <div id="waiting-wrap" class="waiting hidden">
       <div class="section-head">
@@ -224,21 +233,35 @@
   </form>
 </dialog>
 
-<!-- Modal: New day -->
-<dialog id="dlg-newday" class="modal">
-  <form method="dialog" id="form-newday">
-    <h3>Start a new day</h3>
-    <p class="muted">Points reset to 0, log clears. Pick who works today and drag the clock-in order (top = first).</p>
-    <div id="newday-list" class="roster"></div>
-    <div class="field row">
-      <input type="text" id="newday-newname" class="input" placeholder="Add a new tech..." autocomplete="off">
-      <button type="button" class="btn ghost" id="newday-addname">＋</button>
+<!-- Modal: PIN clock-in (tạo lần đầu / xác thực) -->
+<dialog id="dlg-pin" class="modal pin-modal">
+  <form method="dialog" id="form-pin">
+    <h3 id="pin-title">Clock in — <span id="pin-name"></span></h3>
+    <p class="muted" id="pin-hint"></p>
+    <div class="pin-dots" id="pin-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+    <input type="password" id="pin-input" class="input pin-input" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" aria-label="PIN">
+    <div class="numpad" id="numpad">
+      <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+      <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+      <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+      <button type="button" data-k="del" class="np-del">⌫</button><button type="button" data-k="0">0</button><button type="button" data-k="ok" class="np-ok">✓</button>
     </div>
+    <p class="pin-error hidden" id="pin-error">Wrong PIN — try again.</p>
     <div class="modal-actions">
-      <button type="button" class="btn ghost" data-close>Later</button>
-      <button type="submit" class="btn primary">Start new day</button>
+      <button type="button" class="btn ghost" data-close>Cancel</button>
     </div>
   </form>
+</dialog>
+
+<!-- Overlay: xem ảnh clock-in trong log -->
+<dialog id="dlg-photo" class="modal photo-modal">
+  <div>
+    <h3 id="photo-title"></h3>
+    <img id="photo-big" alt="Clock-in photo">
+    <div class="modal-actions">
+      <button type="button" class="btn primary" data-close>Close</button>
+    </div>
+  </div>
 </dialog>
 
 <!-- Modal: Summary -->

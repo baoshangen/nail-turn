@@ -104,6 +104,7 @@
       return Object.assign({ points: 0, status: 'active', joinedAt: Date.now(), lastServedAt: null, jobs: [] }, t, {
         points: Number(t.points) || 0,
         jobs: Array.isArray(t.jobs) ? t.jobs : [],
+        pinHash: typeof t.pinHash === 'string' ? t.pinHash : null,
       });
     });
     out.colors = (s.colors && typeof s.colors === 'object') ? s.colors : {};
@@ -147,6 +148,14 @@
     $('#queue-count').textContent = q.length;
     var qc = $('#queue'); qc.innerHTML = '';
     q.forEach(function (t, i) { qc.appendChild(card(t, i, i === 0)); });
+
+    var offs = state.techs.filter(function (t) { return t.status === 'off'; });
+    var cc = $('#clockin'); cc.innerHTML = '';
+    offs.forEach(function (t) {
+      cc.appendChild(el('button', { type: 'button', class: 'clock-chip', onclick: function () { openPin(t.id); } },
+        [swatch(t.id), el('span', { text: t.name })]));
+    });
+    $('#clockin-wrap').classList.toggle('hidden', offs.length === 0);
 
     var wl = L.waitingList(state);
     var wlc = $('#waiting'); wlc.innerHTML = '';
@@ -318,7 +327,18 @@
       case 'pause': return [el('span', { class: 'tag', text: names + ' on break' })];
       case 'resume': return [el('span', { class: 'tag', text: names + ' back in line' })];
       case 'leave': return [el('span', { class: 'tag', text: names + ' left' })];
-      case 'join': return [el('span', { class: 'tag', text: names + ' clocked in' }), e.weight ? el('span', { class: 'w', text: 'starts at ' + fmtPts(e.weight) }) : null];
+      case 'join': {
+      var joinOut = [el('span', { class: 'tag', text: names + ' clocked in' }), e.weight ? el('span', { class: 'w', text: 'starts at ' + fmtPts(e.weight) }) : null];
+        var ph = photoFor(e);
+        if (ph) {
+          joinOut.push(el('img', { class: 'log-thumb', src: ph, alt: 'clock-in photo', title: 'View photo', onclick: function () {
+            $('#photo-title').textContent = names + ' — ' + fmtTime(e.t);
+            $('#photo-big').src = ph;
+            $('#dlg-photo').showModal();
+          } }));
+        }
+        return joinOut;
+      }
       case 'adjust': return [el('span', { class: 'tag', text: names + ' points adjusted' }), el('span', { class: 'w', text: (e.weight > 0 ? '+' : '−') + fmtPts(Math.abs(e.weight)) }), e.note ? el('span', { class: 'note', text: ' — ' + e.note }) : null];
       default: return [el('span', { text: names + ' ' + e.type })];
     }
@@ -670,67 +690,190 @@
   $('#btn-add').addEventListener('click', openAdd);
   $('[data-action="open-add"]').addEventListener('click', openAdd);
 
-  // ── Ngày mới ──────────────────────────────────────────
-  var newdayCtx = { rows: [] }; // [{id|null, name, working, isNew}]
-  function openNewDay() {
-    var lastActiveOrder = state.techs.slice().sort(function (a, b) { return a.joinedAt - b.joinedAt; });
-    newdayCtx.rows = lastActiveOrder.map(function (t) {
-      return { id: t.id, name: t.name, working: t.status !== 'off', isNew: false };
-    });
-    $('#newday-newname').value = '';
-    renderNewDayList();
-    $('#dlg-newday').showModal();
+  // ── Ngày mới (v7: tự động — không còn dialog sắp thứ tự) ──
+  // Reset: điểm 0, log/waiting sạch, MỌI thợ về 'chưa vào ca' → thứ tự turn = thứ tự bấm Clock in thật.
+  function startNewDay(silent) {
+    apply(function (s) { return L.newDay(s, { workingIds: [] }); }, silent ? null : 'New day started — clock in below');
+    purgePhotos();
   }
-  function renderNewDayList() {
-    var box = $('#newday-list'); box.innerHTML = '';
-    if (!newdayCtx.rows.length) box.appendChild(el('p', { class: 'muted', text: 'No techs yet — add below.' }));
-    newdayCtx.rows.forEach(function (r, i) {
-      var cb = el('input', { type: 'checkbox' });
-      cb.checked = r.working;
-      cb.addEventListener('change', function () { r.working = cb.checked; renderNewDayList(); });
-      box.appendChild(el('div', { class: 'roster-row' + (r.working ? '' : ' off') }, [
-        cb,
-        el('span', { class: 'name', text: r.name + (r.isNew ? ' (new)' : '') }),
-        el('div', { class: 'ops' }, [
-          el('button', { type: 'button', class: 'btn ghost', text: '▲', disabled: i === 0 ? 'true' : null, onclick: function () { move(i, -1); } }),
-          el('button', { type: 'button', class: 'btn ghost', text: '▼', disabled: i === newdayCtx.rows.length - 1 ? 'true' : null, onclick: function () { move(i, 1); } }),
-        ]),
-      ]));
-    });
-  }
-  function move(i, dir) {
-    var j = i + dir; if (j < 0 || j >= newdayCtx.rows.length) return;
-    var tmp = newdayCtx.rows[i]; newdayCtx.rows[i] = newdayCtx.rows[j]; newdayCtx.rows[j] = tmp;
-    renderNewDayList();
-  }
-  function addNewDayName() {
-    var name = $('#newday-newname').value.trim();
-    if (!name) return;
-    newdayCtx.rows.push({ id: null, name: name, working: true, isNew: true });
-    $('#newday-newname').value = '';
-    renderNewDayList();
-  }
-  $('#newday-addname').addEventListener('click', addNewDayName);
-  $('#newday-newname').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); addNewDayName(); } });
-  $('#form-newday').addEventListener('submit', function (ev) {
-    ev.preventDefault();
-    apply(function (s) {
-      var now = Date.now();
-      // 1) thêm thợ mới vào danh sách (điểm sẽ về 0 ở bước newDay)
-      var ids = [];
-      newdayCtx.rows.forEach(function (r) {
-        if (r.id) { ids.push(r.id); return; }
-        var id = 'n' + Math.random().toString(36).slice(2, 9);
-        s = L.addTech(s, { name: r.name, id: id, points: 0, now: now });
-        r.id = id; ids.push(id);
-      });
-      // 2) ngày mới với thứ tự vào ca như trong danh sách
-      var working = newdayCtx.rows.filter(function (r) { return r.working; }).map(function (r) { return r.id; });
-      return L.newDay(s, { now: now, workingIds: working });
-    }, 'New day started');
-    $('#dlg-newday').close();
+  $('#btn-newday').addEventListener('click', function () {
+    if (!confirm('Start a new day? Points reset to 0, the log clears, and everyone clocks in again.')) return;
+    startNewDay();
   });
-  $('#btn-newday').addEventListener('click', openNewDay);
+
+  // ── Clock in v7: PIN 4 số + ảnh webcam ────────────────
+  // Kho ảnh nằm NGOÀI state (state có 20 snapshot undo — nhét base64 vào là phình localStorage).
+  var PHOTO_KEY = 'nail-turn-photos';
+  var photosCache = null;
+  function loadPhotos() {
+    if (photosCache) return photosCache;
+    try {
+      var p = JSON.parse(localStorage.getItem(PHOTO_KEY));
+      if (p && p.date === state.date && p.shots) { photosCache = p; return p; }
+    } catch (e) { /* hỏng thì coi như rỗng */ }
+    photosCache = { date: state.date, shots: {} };
+    return photosCache;
+  }
+  function savePhoto(key, dataUrl) {
+    try {
+      var p = loadPhotos();
+      p.date = state.date;
+      p.shots[key] = dataUrl;
+      localStorage.setItem(PHOTO_KEY, JSON.stringify(p));
+    } catch (e) { console.warn('Không lưu được ảnh clock-in', e); }
+  }
+  function purgePhotos() {
+    photosCache = null;
+    try { localStorage.removeItem(PHOTO_KEY); } catch (e) {}
+  }
+  function photoFor(e) {
+    if (e.type !== 'join' || !e.techIds.length) return null;
+    return loadPhotos().shots[e.techIds[0] + ':' + e.t] || null;
+  }
+
+  // Chụp 1 frame webcam làm bằng chứng. KHÔNG BAO GIỜ chặn clock-in: lỗi/không camera/treo 4s → trả null.
+  function capturePhoto() {
+    return new Promise(function (resolve) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return resolve(null);
+      var done = false;
+      function finish(v, stream) {
+        if (done) return;
+        done = true;
+        if (stream) stream.getTracks().forEach(function (tr) { tr.stop(); });
+        resolve(v);
+      }
+      var to = setTimeout(function () { finish(null); }, 4000);
+      navigator.mediaDevices.getUserMedia({ video: { width: 640 } }).then(function (stream) {
+        var v = document.createElement('video');
+        v.srcObject = stream; v.muted = true; v.playsInline = true;
+        v.onloadedmetadata = function () {
+          v.play().then(function () {
+            setTimeout(function () { // đợi camera sáng lên rồi mới chụp
+              try {
+                var w = 320, h = Math.round(320 * v.videoHeight / v.videoWidth) || 240;
+                var c = document.createElement('canvas'); c.width = w; c.height = h;
+                c.getContext('2d').drawImage(v, 0, 0, w, h);
+                clearTimeout(to); finish(c.toDataURL('image/jpeg', 0.7), stream);
+              } catch (e) { clearTimeout(to); finish(null, stream); }
+            }, 350);
+          }).catch(function () { clearTimeout(to); finish(null, stream); });
+        };
+      }).catch(function () { clearTimeout(to); finish(null); });
+    });
+  }
+
+  // Hash PIN: SHA-256(pin:techId). Môi trường thiếu crypto.subtle → djb2 (yếu nhưng nhất quán cùng máy;
+  // nếu máy đổi sang có subtle thì hash lệch → sếp bấm Reset PIN là xong).
+  function djb2(str) {
+    var h = 5381;
+    for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
+    return 'djb2:' + h.toString(16);
+  }
+  function hashPin(pin, techId) {
+    var msg = pin + ':' + techId;
+    if (window.crypto && crypto.subtle && crypto.subtle.digest) {
+      return crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg)).then(function (buf) {
+        return Array.prototype.map.call(new Uint8Array(buf), function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+      }).catch(function () { return djb2(msg); });
+    }
+    return Promise.resolve(djb2(msg));
+  }
+
+  var pinCtx = { techId: null, mode: 'verify', first: '' };
+  function openPin(techId) {
+    var t = L.findTech(state, techId);
+    if (!t) return;
+    pinCtx = { techId: techId, mode: t.pinHash ? 'verify' : 'create', first: '' };
+    $('#pin-name').textContent = t.name;
+    setPinHint();
+    $('#pin-input').value = '';
+    renderDots();
+    $('#pin-error').classList.add('hidden');
+    $('#dlg-pin').showModal();
+    $('#pin-input').focus();
+  }
+  function setPinHint() {
+    var hints = {
+      verify: 'Enter your 4-digit PIN.',
+      create: 'First time — create your 4-digit PIN.',
+      confirm: 'Type the same PIN again to confirm.',
+    };
+    $('#pin-hint').textContent = hints[pinCtx.mode];
+  }
+  function renderDots() {
+    var n = $('#pin-input').value.length;
+    $$('#pin-dots span').forEach(function (d, i) { d.classList.toggle('full', i < n); });
+  }
+  function pinFail(msg, backToCreate) {
+    var err = $('#pin-error');
+    err.textContent = msg;
+    err.classList.remove('hidden');
+    $('#pin-input').value = '';
+    renderDots();
+    if (backToCreate) { pinCtx.mode = 'create'; pinCtx.first = ''; setPinHint(); }
+    var dlg = $('#dlg-pin');
+    dlg.classList.remove('pin-shake'); void dlg.offsetWidth; dlg.classList.add('pin-shake');
+  }
+  var pinBusy = false; // chặn double-submit trong lúc chờ hash/camera
+  function submitPin() {
+    var pin = $('#pin-input').value;
+    if (pin.length !== 4 || pinBusy) return;
+    var t = L.findTech(state, pinCtx.techId);
+    if (!t) { $('#dlg-pin').close(); return; }
+    $('#pin-error').classList.add('hidden');
+    if (pinCtx.mode === 'create') {
+      pinCtx.first = pin;
+      pinCtx.mode = 'confirm';
+      setPinHint();
+      $('#pin-input').value = '';
+      renderDots();
+      return;
+    }
+    pinBusy = true;
+    if (pinCtx.mode === 'confirm') {
+      if (pin !== pinCtx.first) { pinBusy = false; pinFail("PINs don't match — start over.", true); return; }
+      hashPin(pin, t.id).then(function (h) {
+        pinBusy = false;
+        $('#dlg-pin').close();
+        apply(function (s) { return L.setPin(s, { techId: t.id, pinHash: h }); });
+        clockIn(t.id);
+      });
+      return;
+    }
+    hashPin(pin, t.id).then(function (h) { // verify
+      pinBusy = false;
+      if (h === t.pinHash) { $('#dlg-pin').close(); clockIn(t.id); }
+      else pinFail('Wrong PIN — try again.');
+    });
+  }
+  function clockIn(techId) {
+    capturePhoto().then(function (shot) { // chụp TRƯỚC — đúng khoảnh khắc người bấm đứng trước máy
+      var ts = Date.now();
+      var before = state;
+      apply(function (s) { return L.rejoin(s, { techId: techId, now: ts }); }, nameOf(techId) + ' clocked in');
+      if (state !== before && shot) {
+        savePhoto(techId + ':' + ts, shot);
+        renderLog(); // vẽ lại để thumbnail hiện
+      }
+    });
+  }
+  $('#numpad').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button[data-k]');
+    if (!b) return;
+    var k = b.dataset.k;
+    var inp = $('#pin-input');
+    if (k === 'del') inp.value = inp.value.slice(0, -1);
+    else if (k === 'ok') { submitPin(); return; }
+    else if (inp.value.length < 4) inp.value += k;
+    renderDots();
+    if (inp.value.length === 4) submitPin();
+  });
+  $('#pin-input').addEventListener('input', function () { // bàn phím thật cũng gõ được
+    this.value = this.value.replace(/\D/g, '').slice(0, 4);
+    renderDots();
+    if (this.value.length === 4) submitPin();
+  });
+  $('#form-pin').addEventListener('submit', function (ev) { ev.preventDefault(); submitPin(); });
 
   // ── Tổng kết ──────────────────────────────────────────
   $('#btn-summary').addEventListener('click', function () {
@@ -813,6 +956,12 @@
         el('span', { class: 'muted', text: '•' }),
         el('span', { class: 'name', text: t.name }),
         el('div', { class: 'ops' }, [
+          el('button', { type: 'button', class: 'btn ghost', text: 'Reset PIN', onclick: function () {
+            if (!t.pinHash) { alert(t.name + " has no PIN yet — they'll create one at next clock-in."); return; }
+            if (!confirm('Reset PIN for ' + t.name + '? They will create a new one at next clock-in.')) return;
+            apply(function (s) { return L.setPin(s, { techId: t.id, pinHash: null }); }, 'PIN reset for ' + t.name);
+            renderSettingsRoster();
+          } }),
           el('button', { type: 'button', class: 'btn ghost', text: 'Rename', onclick: function () {
             var n = prompt('New name for ' + t.name + ':', t.name);
             if (n && n.trim()) apply(function (s) { return L.renameTech(s, { techId: t.id, name: n }); });
@@ -879,6 +1028,13 @@
 
   // ── Khởi động ─────────────────────────────────────────
   state = load();
+  // v7: qua ngày mới → TỰ reset (điểm 0, mọi thợ về "chưa vào ca"), thợ tới đâu Clock in tới đó
+  if (state.techs.length > 0 && L.isNewDay(state)) {
+    state = L.newDay(state, { workingIds: [] });
+    save();
+    purgePhotos();
+    toast('New day started — clock in below');
+  }
   if (window.Hero3D) {
     var q0 = L.queue(state);
     Hero3D.mount($('#hero3d'), { color: q0.length ? colorOf(q0[0].id) : DEFAULT_SHADE, pointerZone: $('#topbar') });
@@ -911,7 +1067,5 @@
   render();
   if (state.techs.length === 0) {
     // lần đầu dùng: hướng dẫn thêm thợ
-  } else if (L.isNewDay(state)) {
-    openNewDay();
   }
 })();
