@@ -30,6 +30,8 @@
     <button id="btn-wait" class="btn ghost" title="Walk-in waiting, no tech assigned yet">＋ Waiting</button>
     <button id="btn-add" class="btn ghost">＋ Tech</button>
     <button id="btn-summary" class="btn ghost">Summary</button>
+    <button id="btn-history" class="btn ghost" title="Past days, week by week">History</button>
+    <button id="btn-cloud" class="btn ghost icon cloud-off" title="Owner account" aria-label="Owner account">☁</button>
     <button id="btn-theme" class="btn ghost icon" title="Light / dark" aria-label="Toggle theme">🌙</button>
     <button id="btn-settings" class="btn ghost icon" title="Settings" aria-label="Settings">⚙</button>
     <button id="btn-newday" class="btn primary">New day</button>
@@ -41,19 +43,26 @@
     <!-- Thợ chưa vào ca — tap tên + PIN để clock in, thứ tự turn = thứ tự tới thật -->
     <div id="clockin-wrap" class="clockin hidden">
       <div class="section-head">
-        <h2>👋 Clock in</h2>
-        <p class="hint">Tap your name when you arrive — the turn order follows real arrival time.</p>
+        <h2>👋 Clock in <span id="clockin-count" class="pill"></span></h2>
+        <div class="head-ops">
+          <p class="hint">Tap your name when you arrive — the turn order follows real arrival time.</p>
+          <button type="button" id="btn-clockin-toggle" class="btn subtle" aria-expanded="true" aria-controls="clockin">Hide</button>
+        </div>
       </div>
       <div id="clockin" class="clock-chips"></div>
+      <p id="clockin-extra" class="clockin-extra hidden">
+        <span id="clockin-extra-text"></span>
+        <button type="button" id="btn-clockin-all" class="linkish">Show everyone</button>
+      </p>
     </div>
 
     <!-- Khách chờ chưa gán thợ -->
     <div id="waiting-wrap" class="waiting hidden">
       <div class="section-head">
         <h2>⏳ Waiting <span id="waiting-count" class="pill"></span></h2>
-        <p class="hint">Customers with no tech assigned yet. Tap <b>Assign</b> when someone is ready.</p>
+        <p class="hint">Line up the work ahead of time. The turn only counts when someone taps <b>Start</b>.</p>
       </div>
-      <div id="waiting" class="cards small"></div>
+      <div id="waiting" class="cards wait-cards"></div>
     </div>
 
     <div class="section-head">
@@ -63,7 +72,9 @@
     <div id="queue" class="cards"></div>
     <div id="queue-empty" class="queue-empty hidden">
       <span class="live-dot" aria-hidden="true"></span>
-      No one is free — everyone is with a customer. Wait for a <b>Done</b>, use <b>＋ Take another</b>, or add the customer to <b>Waiting</b>.
+      <!-- Bọc trong 1 span: .queue-empty là flex, để trần thì mỗi <b> thành một ô flex
+           riêng và câu văn bị xé rời ra với khoảng hở 12px giữa các mảnh -->
+      <span>No one is free — everyone is with a customer. Wait for a <b>Done</b>, use <b>＋ Take another</b>, or add the customer to <b>Waiting</b>.</span>
     </div>
 
     <div id="working-wrap" class="working hidden">
@@ -82,7 +93,7 @@
     </div>
 
     <div id="empty" class="empty hidden">
-      <p>No techs clocked in today.</p>
+      <p id="empty-msg">No techs clocked in today.</p>
       <button class="btn primary" data-action="open-add">＋ Add tech</button>
     </div>
   </section>
@@ -142,26 +153,32 @@
   </div>
 </dialog>
 
-<!-- Modal: Add waiting customer (no tech yet) -->
+<!-- Modal: Add waiting customer, or add one more part to a waiting customer -->
 <dialog id="dlg-wait" class="modal">
   <form method="dialog" id="form-wait">
-    <h3>⏳ Add waiting customer</h3>
-    <p class="muted">No tech assigned yet — points count when a tech takes them.</p>
+    <h3 id="wait-title">⏳ Add waiting customer</h3>
+    <p class="muted" id="wait-sub">Line the work up now. The turn only counts when someone taps Start.</p>
     <div class="field">
       <label>Service</label>
       <div id="wait-services" class="chips"></div>
     </div>
-    <div class="field">
-      <label>Turns</label>
-      <input type="number" id="wait-weight" class="input" step="0.25" min="0" value="1">
+    <div class="field row">
+      <div style="flex:0 0 120px">
+        <label style="display:block;font-weight:600;font-size:12.5px;margin-bottom:7px">Turns</label>
+        <input type="number" id="wait-weight" class="input" step="0.25" min="0" value="1">
+      </div>
+      <div style="flex:1">
+        <label style="display:block;font-weight:600;font-size:12.5px;margin-bottom:7px">Tech <span class="muted">(optional)</span></label>
+        <select id="wait-tech" class="input"></select>
+      </div>
     </div>
-    <div class="field">
+    <div class="field" id="wait-note-field">
       <label>Note <span class="muted">(optional)</span></label>
       <input type="text" id="wait-note" class="input" placeholder="e.g. name, requested color...">
     </div>
     <div class="modal-actions">
       <button type="button" class="btn ghost" data-close>Cancel</button>
-      <button type="submit" class="btn primary">Add</button>
+      <button type="submit" class="btn primary" id="wait-submit">Add</button>
     </div>
   </form>
 </dialog>
@@ -178,9 +195,9 @@
     <div class="field">
       <div class="seg2" id="claim-when">
         <button type="button" class="seg2-btn on" data-v="start">Start now</button>
-        <button type="button" class="seg2-btn" data-v="hold">Hold for later</button>
+        <button type="button" class="seg2-btn" data-v="hold">Assign only</button>
       </div>
-      <p class="muted tiny">Start now = tech sits down with the customer. Hold = tech keeps the customer but stays in line until they start.</p>
+      <p class="muted tiny"><b>Start now</b> = tech sits down with the customer, and the turn counts right away. <b>Assign only</b> = pencil them in. No turn counts yet, and they keep taking walk-ins until you tap Start.</p>
     </div>
     <div class="modal-actions">
       <button type="button" class="btn ghost" data-close>Cancel</button>
@@ -278,6 +295,98 @@
   </div>
 </dialog>
 
+<!-- Modal: History — mỗi tuần một bảng, cột Thứ 2 → Chủ nhật -->
+<dialog id="dlg-history" class="modal wide">
+  <div>
+    <h3>History</h3>
+    <div class="week-nav">
+      <button type="button" class="btn ghost" id="hist-prev" title="Previous week">◀</button>
+      <b id="hist-label" class="week-label"></b>
+      <button type="button" class="btn ghost" id="hist-next" title="Next week">▶</button>
+      <button type="button" class="btn subtle" id="hist-today">This week</button>
+    </div>
+    <div class="table-scroll">
+      <table class="table week-table" id="hist-table">
+        <thead><tr id="hist-head"></tr></thead>
+        <tbody></tbody>
+        <tfoot><tr id="hist-foot"></tr></tfoot>
+      </table>
+    </div>
+    <p id="hist-empty" class="empty-note hidden">Nothing saved for this week. A day gets saved to History the moment you start the next day.</p>
+    <p class="muted tiny" id="hist-note"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" id="hist-csv">Export CSV</button>
+      <button type="button" class="btn primary" data-close>Close</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Modal: Weekly schedule — ai làm thứ mấy -->
+<dialog id="dlg-schedule" class="modal wide">
+  <div>
+    <h3>Weekly schedule</h3>
+    <p class="muted">Tick the days each tech works. On any given day, <b>Clock in</b> only shows the techs scheduled for that day.</p>
+    <div class="table-scroll">
+      <table class="table sched-table" id="sched-table">
+        <thead><tr>
+          <th>Tech</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="muted tiny">A tech with no day ticked never shows in Clock in. If someone turns up off-schedule, tap <b>Show everyone</b> on the board.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn primary" data-close>Done</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Modal: Owner account (Supabase) -->
+<dialog id="dlg-account" class="modal">
+  <form method="dialog" id="form-account">
+    <h3>Owner account</h3>
+    <p class="muted">Sign in and every finished day is saved to your own Supabase project, so you can open the history from any machine.</p>
+
+    <div id="acct-setup" class="field">
+      <label>Supabase project <span class="muted">(one-time setup)</span></label>
+      <input id="acct-url" class="input" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off" spellcheck="false">
+      <input id="acct-key" class="input" placeholder="anon public key" autocomplete="off" spellcheck="false" style="margin-top:8px">
+      <p class="muted tiny">Create a free project at supabase.com, run <b>supabase-setup.sql</b> in its SQL editor, then paste the Project URL and the anon key from Project Settings → API.</p>
+      <div class="field row">
+        <button type="button" class="btn primary" id="acct-save-keys">Save keys</button>
+        <button type="button" class="btn subtle" id="acct-forget-keys">Forget keys</button>
+      </div>
+    </div>
+
+    <div id="acct-login" class="field hidden">
+      <label>Email</label>
+      <input id="acct-email" class="input" type="email" autocomplete="username" spellcheck="false">
+      <label style="display:block;margin:10px 0 7px">Password</label>
+      <input id="acct-pass" class="input" type="password" autocomplete="current-password">
+      <div class="field row">
+        <button type="submit" class="btn primary" id="acct-signin">Sign in</button>
+        <button type="button" class="btn ghost" id="acct-signup">Create account</button>
+        <button type="button" class="btn subtle" id="acct-change-keys">Change project</button>
+      </div>
+    </div>
+
+    <div id="acct-in" class="field hidden">
+      <p>Signed in as <b id="acct-who"></b></p>
+      <p class="muted tiny" id="acct-sync-state"></p>
+      <div class="field row">
+        <button type="button" class="btn primary" id="acct-sync">Sync now</button>
+        <button type="button" class="btn ghost" id="acct-restore">Restore techs + schedule</button>
+        <button type="button" class="btn subtle" id="acct-signout">Sign out</button>
+      </div>
+    </div>
+
+    <p id="acct-msg" class="acct-msg hidden"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" data-close>Close</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- Modal: Settings -->
 <dialog id="dlg-settings" class="modal">
   <div>
@@ -304,6 +413,10 @@
       <div id="settings-roster" class="roster"></div>
     </div>
     <div class="field row">
+      <button type="button" class="btn ghost" id="btn-schedule">Weekly schedule</button>
+      <button type="button" class="btn ghost" id="btn-account">Owner account</button>
+    </div>
+    <div class="field row">
       <button type="button" class="btn ghost" id="btn-export">Backup (JSON)</button>
       <button type="button" class="btn ghost" id="btn-import">Restore from JSON</button>
       <input type="file" id="import-file" accept="application/json" class="hidden">
@@ -319,6 +432,7 @@
 
 <script src="fx.js"></script>
 <script src="turn-logic.js"></script>
+<script src="cloud.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

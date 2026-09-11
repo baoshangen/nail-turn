@@ -45,6 +45,32 @@
     return d.getFullYear() + '-' + m + '-' + day;
   }
 
+  /* ── Ngày tháng ────────────────────────────────────────
+   * Luôn dựng Date từ 3 số rời (năm, tháng, ngày) chứ KHÔNG new Date('2026-09-09'):
+   * chuỗi ISO trần bị đọc theo giờ UTC, ở múi giờ Mỹ sẽ lùi thành hôm trước.
+   */
+  function parseDate(str) {
+    var p = String(str).split('-');
+    return new Date(+p[0], +p[1] - 1, +p[2]);
+  }
+  // Thứ trong tuần của 1 ngày: 0 = Chủ nhật ... 6 = Thứ bảy (đúng chuẩn Date.getDay).
+  function dayIndexOf(dateStr) { return parseDate(dateStr).getDay(); }
+  function addDays(dateStr, n) {
+    var d = parseDate(dateStr);
+    d.setDate(d.getDate() + n);
+    return todayStr(d.getTime());
+  }
+  // Thứ 2 của tuần chứa ngày này (tuần tiệm chạy Thứ 2 → Chủ nhật, theo yêu cầu của Ray).
+  function weekStart(dateStr) {
+    var d = dayIndexOf(dateStr);
+    return addDays(dateStr, d === 0 ? -6 : 1 - d);
+  }
+  function weekDays(monday) {
+    var out = [];
+    for (var i = 0; i < 7; i++) out.push(addDays(monday, i));
+    return out;
+  }
+
   function newId() {
     return 't' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
   }
@@ -257,23 +283,83 @@
     return (state.waiting || []).slice().sort(function (a, b) { return a.createdAt - b.createdAt; });
   }
 
-  // Thêm khách chờ độc lập (walk-in vô ngồi đợi, chưa thợ nào rảnh).
+  /*
+   * Gom các phần việc của CÙNG một khách chờ thành 1 nhóm.
+   * Khách làm chân + tay = 1 người ngồi đó, không phải 2 khách — nên trên màn hình
+   * phải là 1 thẻ có nhiều dòng, chứ không phải nhiều thẻ rời.
+   */
+  function waitingGroups(state) {
+    var order = [], by = {};
+    waitingList(state).forEach(function (x) {
+      if (!by[x.ticket]) {
+        by[x.ticket] = { ticket: x.ticket, createdAt: x.createdAt, note: '', parts: [], weight: 0, assigned: 0 };
+        order.push(x.ticket);
+      }
+      var g = by[x.ticket];
+      if (x.createdAt < g.createdAt) g.createdAt = x.createdAt;
+      if (!g.note && x.note) g.note = x.note;
+      g.weight = round2(g.weight + (Number(x.weight) || 0));
+      if (x.techId) g.assigned += 1;
+      g.parts.push(x);
+    });
+    return order.map(function (k) { return by[k]; })
+      .sort(function (a, b) { return a.createdAt - b.createdAt; });
+  }
+
+  /*
+   * Thêm khách chờ. Truyền `ticket` của một khách đang chờ = thêm PHẦN VIỆC cho chính người đó.
+   * `techId` = gán sẵn thợ để sắp xếp trước; CỐ Ý KHÔNG tính turn ở đây —
+   * turn chỉ tính lúc bấm Start (claimWaiting), nên khách bỏ về thì không ai thiệt.
+   */
   function addWaiting(state, opts) {
     var now = opts.now != null ? opts.now : Date.now();
     var w = Number(opts.weight);
     if (!(w >= 0)) throw new Error('Invalid turn amount');
     return commit(state, function (s) {
       if (!s.waiting) s.waiting = [];
-      var ticket = 'j' + now.toString(36) + Math.random().toString(36).slice(2, 6);
-      s.waiting.push({ wid: newId(), ticket: ticket, service: opts.service || '', weight: w, note: opts.note || '', createdAt: now });
-      addLog(s, { t: now, type: 'wait', techIds: [], weight: 0, note: opts.note || '', service: opts.service || '', jobId: ticket });
+      var ticket = opts.ticket || ('j' + now.toString(36) + Math.random().toString(36).slice(2, 6));
+      if (opts.ticket && !s.waiting.some(function (x) { return x.ticket === opts.ticket; })) {
+        throw new Error('Waiting customer not found');
+      }
+      var techId = opts.techId || null;
+      if (techId && !findTech(s, techId)) throw new Error('Tech not found');
+      s.waiting.push({
+        wid: newId(), ticket: ticket, service: opts.service || '', weight: w,
+        note: opts.note || '', createdAt: now, techId: techId,
+      });
+      addLog(s, {
+        t: now, type: 'wait', techIds: techId ? [techId] : [], weight: 0,
+        note: opts.note || '', service: opts.service || '', jobId: ticket, assigned: !!techId,
+      });
     });
   }
 
   /*
-   * Thợ nhận khách chờ. ĐIỂM TÍNH LÚC NHẬN (không phải lúc tạo pending) →
-   * không phá luật công bằng khi có hẹn/walk-in chen vào giữa.
-   * start=true: ngồi làm ngay (bận). start=false: giữ khách, làm sau (vẫn ở hàng chờ).
+   * Gán sẵn / đổi / bỏ thợ cho MỘT phần việc của khách đang chờ (techId = null để bỏ).
+   * KHÔNG đụng điểm của ai: đây mới chỉ là sắp xếp trước. Thợ được gán vẫn đứng nguyên
+   * trong hàng chờ và vẫn nhận walk-in bình thường, khỏi ngồi không đợi khách tới.
+   */
+  function setWaitingTech(state, opts) {
+    var now = opts.now != null ? opts.now : Date.now();
+    return commit(state, function (s) {
+      var item = (s.waiting || []).filter(function (x) { return x.wid === opts.wid; })[0];
+      if (!item) throw new Error('Waiting customer not found');
+      var techId = opts.techId || null;
+      if (techId && !findTech(s, techId)) throw new Error('Tech not found');
+      var from = item.techId || null;
+      if (from === techId) return; // bấm lại đúng người đang gán → khỏi ghi nhật ký thừa
+      item.techId = techId;
+      addLog(s, {
+        t: now, type: 'preassign', techIds: techId ? [techId] : (from ? [from] : []),
+        weight: 0, note: '', service: item.service || '', jobId: item.ticket, cleared: !techId,
+      });
+    });
+  }
+
+  /*
+   * Thợ NGỒI VÀO LÀM khách chờ — đây mới là lúc turn được tính.
+   * Không truyền techId thì lấy người đã gán sẵn trên phần việc đó.
+   * start=true: làm ngay (bận). start=false: giữ khách, làm sau (vẫn ở hàng chờ, turn đã tính).
    */
   function claimWaiting(state, opts) {
     var now = opts.now != null ? opts.now : Date.now();
@@ -281,7 +367,7 @@
       var list = s.waiting || [];
       var idx = list.findIndex(function (x) { return x.wid === opts.wid; });
       if (idx < 0) throw new Error('Waiting customer not found');
-      var t = findTech(s, opts.techId);
+      var t = findTech(s, opts.techId || list[idx].techId);
       if (!t) throw new Error('Tech not found');
       var item = list.splice(idx, 1)[0];
       var w = Number(item.weight) || 0;
@@ -298,7 +384,27 @@
     });
   }
 
-  // Huỷ khách chờ (khách đổi ý/về) — chưa ai bị tính điểm nên không phải trả gì.
+  /*
+   * Huỷ CẢ khách chờ (mọi phần việc của cùng 1 ticket) trong MỘT bước.
+   * Gọi cancelWaiting nhiều lần cũng ra kết quả y hệt, nhưng khi đó Ray phải bấm
+   * Hoàn tác đúng bằng số phần việc mới lấy khách lại — xoá nhầm là bực.
+   */
+  function cancelWaitingTicket(state, opts) {
+    var now = opts.now != null ? opts.now : Date.now();
+    return commit(state, function (s) {
+      var list = s.waiting || [];
+      var gone = list.filter(function (x) { return x.ticket === opts.ticket; });
+      if (!gone.length) throw new Error('Waiting customer not found');
+      s.waiting = list.filter(function (x) { return x.ticket !== opts.ticket; });
+      addLog(s, {
+        t: now, type: 'unwait', techIds: [], weight: 0, note: gone[0].note || '',
+        service: gone.map(function (x) { return x.service; }).filter(Boolean).join(' + '),
+        jobId: opts.ticket, parts: gone.length,
+      });
+    });
+  }
+
+  // Huỷ MỘT phần việc của khách chờ — chưa ai bị tính điểm nên không phải trả gì.
   function cancelWaiting(state, opts) {
     var now = opts.now != null ? opts.now : Date.now();
     return commit(state, function (s) {
@@ -424,12 +530,78 @@
     });
   }
 
+  /* ── Lịch làm cố định trong tuần ───────────────────────
+   * tech.workDays = mảng thứ (0=CN … 6=T7) mà thợ này đi làm.
+   * KHÔNG phải mảng = chưa khai lịch → làm mọi ngày (dữ liệu cũ chạy y như trước).
+   * Mảng RỖNG = không làm ngày nào (Ray bỏ tick hết 7 ô).
+   */
+  function worksOn(tech, dayIndex) {
+    if (!tech || !Array.isArray(tech.workDays)) return true;
+    return tech.workDays.indexOf(dayIndex) >= 0;
+  }
+  // Thợ có lịch làm vào thứ này (không quan tâm hôm nay họ đã clock in chưa).
+  function scheduledOn(state, dayIndex) {
+    return state.techs.filter(function (t) { return worksOn(t, dayIndex); });
+  }
+  function setWorkDays(state, opts) {
+    var raw = Array.isArray(opts.days) ? opts.days.map(Number) : [];
+    var days = raw.filter(function (d, i) {
+      return d >= 0 && d <= 6 && Math.floor(d) === d && raw.indexOf(d) === i;
+    }).sort(function (a, b) { return a - b; });
+    return commit(state, function (s) {
+      var t = findTech(s, opts.techId);
+      if (!t) throw new Error('Tech not found');
+      t.workDays = days;
+    });
+  }
+
   // Đặt/xoá PIN clock-in của thợ. Hash tính ở tầng UI (app.js) — logic thuần chỉ giữ chuỗi.
   function setPin(state, opts) {
     return commit(state, function (s) {
       var t = findTech(s, opts.techId);
       if (!t) throw new Error('Tech not found');
       t.pinHash = opts.pinHash || null;
+    });
+  }
+
+  /*
+   * Nạp danh sách thợ + lịch tuần + cài đặt từ một bản sao lưu (đám mây hoặc file JSON).
+   * CỐ Ý KHÔNG đụng điểm, trạng thái, hay khách đang làm của hôm nay — Ray có thể bấm
+   * "Restore" giữa ca đông khách, và mất bảng turn đang chạy thì tai hại hơn nhiều
+   * so với việc thiếu một cái tên. Thợ trùng id → cập nhật tên/lịch/PIN. Thợ lạ → thêm dạng 'off'.
+   */
+  function importRoster(state, payload, opts) {
+    opts = opts || {};
+    var now = opts.now != null ? opts.now : Date.now();
+    var list = (payload && Array.isArray(payload.techs)) ? payload.techs : [];
+    return commit(state, function (s) {
+      list.forEach(function (r) {
+        if (!r || !r.id || !r.name) return;
+        var t = findTech(s, r.id);
+        if (!t) {
+          t = { id: r.id, name: String(r.name), points: 0, status: 'off', joinedAt: now, lastServedAt: null, jobs: [] };
+          s.techs.push(t);
+        }
+        t.name = String(r.name);
+        if (Array.isArray(r.workDays)) {
+          var raw = r.workDays.map(Number);
+          t.workDays = raw.filter(function (d, i) {
+            return d >= 0 && d <= 6 && Math.floor(d) === d && raw.indexOf(d) === i;
+          }).sort(function (a, b) { return a - b; });
+        }
+        if (typeof r.pinHash === 'string' && r.pinHash) t.pinHash = r.pinHash;
+      });
+      if (payload && payload.settings && typeof payload.settings === 'object') {
+        var patch = {};
+        if (typeof payload.settings.skipCosts === 'boolean') patch.skipCosts = payload.settings.skipCosts;
+        if (typeof payload.settings.lateCatchUp === 'boolean') patch.lateCatchUp = payload.settings.lateCatchUp;
+        if (Array.isArray(payload.settings.services) && payload.settings.services.length) {
+          patch.services = payload.settings.services.filter(function (x) {
+            return x && x.name && Number(x.weight) >= 0;
+          }).map(function (x) { return { name: String(x.name), weight: Number(x.weight) }; });
+        }
+        s.settings = Object.assign({}, s.settings, patch);
+      }
     });
   }
 
@@ -493,21 +665,98 @@
     return state.date !== todayStr(now != null ? now : Date.now());
   }
 
+  /*
+   * Số khách của 1 thợ trong ngày. Không đếm mộc theo log 'assign' được, vì:
+   *   - huỷ phần đang giữ (cancel) → khách đó không còn của ai, phải trừ ra;
+   *   - chuyển phần việc (switch) → đầu khách đi theo công việc sang người mới.
+   * Turn đã đi theo đúng luật này trong cancelPending/switchPending; đây là cho khớp phần đếm.
+   */
+  function customersOf(state, techId) {
+    var n = 0;
+    (state.log || []).forEach(function (e) {
+      if (!e || !Array.isArray(e.techIds)) return;
+      if (e.type === 'switch') {
+        if (e.techIds[0] === techId) n -= 1;
+        if (e.techIds[1] === techId) n += 1;
+        return;
+      }
+      if (e.techIds.indexOf(techId) < 0) return;
+      if (e.type === 'assign' || e.type === 'claim') n += 1;
+      else if (e.type === 'cancel') n -= 1;
+    });
+    return Math.max(0, n);
+  }
+
   // Tổng kết hôm nay: mỗi thợ bao nhiêu khách / bao nhiêu turn / bao nhiêu lần skip.
   function summary(state) {
     return state.techs
       .filter(function (t) { return t.status !== 'off'; })
       .map(function (t) {
-        var customers = 0, skips = 0, minutes = 0;
+        var skips = 0, minutes = 0;
         state.log.forEach(function (e) {
           if (e.techIds.indexOf(t.id) < 0) return;
-          if (e.type === 'assign' || e.type === 'claim') customers += 1;
           if (e.type === 'skip') skips += 1;
           if (e.type === 'finish') minutes += e.minutes || 0;
         });
-        return { id: t.id, name: t.name, points: t.points, customers: customers, skips: skips, minutes: minutes, busy: isBusy(t), status: t.status };
+        return { id: t.id, name: t.name, points: t.points, customers: customersOf(state, t.id), skips: skips, minutes: minutes, busy: isBusy(t), status: t.status };
       })
       .sort(function (a, b) { return b.points - a.points; });
+  }
+
+  /* ── Lịch sử nhiều ngày ────────────────────────────────
+   * Bản ghi 1 ngày, cất lại TRƯỚC khi reset sang ngày mới. Cố tình để rất gọn
+   * (không giữ nhật ký thô) vì kho lịch sử phải sống lâu trong localStorage.
+   */
+  function dayRecord(state) {
+    return {
+      date: state.date,
+      techs: summary(state).map(function (r) {
+        return { id: r.id, name: r.name, points: r.points, customers: r.customers, skips: r.skips, minutes: r.minutes };
+      }),
+    };
+  }
+  // Ngày đó có gì đáng lưu không — ngày tiệm đóng cửa thì khỏi cất bản ghi rỗng.
+  function isEmptyRecord(rec) {
+    if (!rec || !Array.isArray(rec.techs) || !rec.techs.length) return true;
+    return !rec.techs.some(function (r) { return r.points || r.customers || r.minutes || r.skips; });
+  }
+
+  /*
+   * Bảng tuần: hàng = thợ, cột = Thứ 2 … Chủ nhật.
+   * records = { 'YYYY-MM-DD': dayRecord }. Ô không có dữ liệu = null (khác với 0 turn:
+   * null nghĩa là hôm đó thợ không đi làm, 0 nghĩa là có đi mà chưa có khách nào).
+   */
+  function weekTable(records, monday) {
+    var days = weekDays(monday);
+    var order = [], byId = {};
+    days.forEach(function (date, col) {
+      var rec = records && records[date];
+      if (!rec || !Array.isArray(rec.techs)) return;
+      rec.techs.forEach(function (r) {
+        if (!byId[r.id]) {
+          byId[r.id] = { id: r.id, name: r.name, cells: days.map(function () { return null; }), points: 0, customers: 0, minutes: 0, days: 0 };
+          order.push(r.id);
+        }
+        var row = byId[r.id];
+        row.name = r.name; // tên mới nhất trong tuần thắng, phòng khi Ray đổi tên giữa tuần
+        row.cells[col] = { points: r.points, customers: r.customers, minutes: r.minutes || 0 };
+        row.points = round2(row.points + r.points);
+        row.customers += r.customers;
+        row.minutes += r.minutes || 0;
+        row.days += 1;
+      });
+    });
+    var rows = order.map(function (id) { return byId[id]; }).sort(function (a, b) {
+      return b.points - a.points || String(a.name).localeCompare(String(b.name));
+    });
+    var dayTotals = days.map(function (date, col) {
+      return round2(rows.reduce(function (sum, r) { return sum + (r.cells[col] ? r.cells[col].points : 0); }, 0));
+    });
+    return {
+      monday: monday, days: days, rows: rows, dayTotals: dayTotals,
+      total: round2(rows.reduce(function (s, r) { return s + r.points; }, 0)),
+      customers: rows.reduce(function (s, r) { return s + r.customers; }, 0),
+    };
   }
 
   function round2(n) {
@@ -520,6 +769,17 @@
     createState: createState,
     todayStr: todayStr,
     isNewDay: isNewDay,
+    dayIndexOf: dayIndexOf,
+    addDays: addDays,
+    weekStart: weekStart,
+    weekDays: weekDays,
+    worksOn: worksOn,
+    scheduledOn: scheduledOn,
+    setWorkDays: setWorkDays,
+    customersOf: customersOf,
+    dayRecord: dayRecord,
+    isEmptyRecord: isEmptyRecord,
+    weekTable: weekTable,
     compareTechs: compareTechs,
     queue: queue,
     nextTech: nextTech,
@@ -539,15 +799,19 @@
     cancelPending: cancelPending,
     assign: assign,
     waitingList: waitingList,
+    waitingGroups: waitingGroups,
     addWaiting: addWaiting,
+    setWaitingTech: setWaitingTech,
     claimWaiting: claimWaiting,
     cancelWaiting: cancelWaiting,
+    cancelWaitingTicket: cancelWaitingTicket,
     skip: skip,
     pause: pause,
     resume: resume,
     leave: leave,
     adjust: adjust,
     setPin: setPin,
+    importRoster: importRoster,
     renameTech: renameTech,
     removeTech: removeTech,
     updateSettings: updateSettings,

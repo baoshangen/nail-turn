@@ -100,14 +100,6 @@ p { margin: 0; }
   border-bottom: 1px solid var(--hair);
 }
 .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
-#hero3d {
-  width: 108px; height: 108px; flex: 0 0 auto;
-  margin: -12px 0;
-  opacity: 0; transition: opacity .8s ease .2s;
-  cursor: default;
-}
-#hero3d.hero3d-ready, #hero3d.hero3d-fallback { opacity: 1; }
-#hero3d canvas { display: block; width: 100% !important; height: 100% !important; }
 .brand-text { display: flex; flex-direction: column; gap: 3px; }
 .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .18em; text-transform: uppercase; color: var(--rose); }
 .today { color: var(--ink-2); font-size: 13px; }
@@ -126,7 +118,6 @@ h1 { white-space: nowrap; }
   .topbar-actions .btn { padding: 8px 11px; font-size: 13px; }
   .queue-stat span { display: none; }
   .queue-stat { margin-right: 4px; padding-right: 10px; }
-  #hero3d { width: 88px; height: 88px; margin: -10px 0; }
 }
 /* Điện thoại: header xếp 2 tầng — thương hiệu trên, nút dưới, không chồng chữ */
 @media (max-width: 720px) {
@@ -138,7 +129,6 @@ h1 { white-space: nowrap; }
   .topbar-actions .btn { padding: 8px 10px; font-size: 13px; }
   .queue-stat { margin-right: 2px; padding-right: 8px; }
   .queue-stat b { font-size: 22px; }
-  #hero3d { width: 72px; height: 72px; margin: -6px 0; }
   .layout { padding: 14px; gap: 16px; }
   .section-head { flex-direction: column; align-items: flex-start; gap: 4px; }
   .job { flex-wrap: wrap; }
@@ -500,3 +490,118 @@ h1 { white-space: nowrap; }
 
 .log-thumb { width: 28px; height: 28px; object-fit: cover; border-radius: 7px; cursor: zoom-in; vertical-align: middle; margin-left: 6px; border: 1px solid var(--hair-2); }
 .photo-modal img { max-width: min(78vw, 480px); border-radius: 12px; display: block; margin: 6px auto; }
+
+/* ── v8: Clock in thu gọn được ───────────────────────── */
+.head-ops { display: flex; align-items: baseline; gap: 12px; }
+.head-ops .hint { margin: 0; }
+.head-ops .btn { padding: 4px 10px; font-size: 12px; flex: 0 0 auto; }
+.clockin-extra { margin-top: 10px; font-size: 12.5px; color: var(--ink-3); }
+.linkish {
+  font: inherit; font-size: inherit; font-weight: 600; cursor: pointer;
+  background: none; border: 0; padding: 0; color: var(--rose-deep);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.linkish:hover { color: var(--rose); }
+/* Thu gọn xong vẫn phải thấy khu này còn tồn tại, nếu không thợ tưởng app hỏng */
+.clockin.collapsed .clock-chips, .clockin.collapsed .clockin-extra { display: none; }
+.clockin.collapsed { padding-bottom: 4px; border-bottom: 1px dashed var(--hair-2); margin-bottom: 18px; }
+.clockin.collapsed .section-head { margin-bottom: 8px; }
+
+/* ── v8: bảng rộng trong popup ───────────────────────── */
+.modal.wide { width: min(940px, 95vw); }
+/* Bảng 7 cột không được đẩy popup tràn màn hình — cho cuộn ngang trong khung riêng */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; padding: 0 4px; }
+.week-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.week-label { font-family: var(--display); font-size: 21px; font-weight: 600; flex: 1; min-width: 160px; font-feature-settings: 'lnum' 1; }
+.week-nav .btn { padding: 7px 12px; }
+
+.week-table th, .week-table td { padding: 8px 9px; white-space: nowrap; }
+.week-table th.day-col, .week-table td.day-col { text-align: center; }
+.week-table th.today-col { color: var(--rose-deep); }
+.week-table td.today-col { background: var(--rose-soft); }
+.week-table .who { font-weight: 600; position: sticky; left: 0; background: var(--glass-strong); }
+.week-table .cell-pts { font-family: var(--mono); font-size: 14px; }
+.week-table .cell-cus { display: block; font-size: 10.5px; color: var(--ink-3); }
+.week-table .cell-off { color: var(--ink-3); opacity: .55; }
+.week-table tfoot td, .week-table .total-col { font-weight: 700; }
+.week-table tfoot td { border-top: 2px solid var(--hair-2); border-bottom: 0; }
+.empty-note {
+  padding: 26px 18px; text-align: center; color: var(--ink-2);
+  border: 1.5px dashed var(--hair-2); border-radius: var(--radius); margin-top: 4px;
+}
+
+/* ── v8: lịch làm cố định ────────────────────────────── */
+.sched-table td, .sched-table th { text-align: center; }
+.sched-table td.who, .sched-table th:first-child { text-align: left; }
+.sched-table input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--rose); cursor: pointer; }
+.sched-table .sched-sum { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.sched-table tr.nodays td.who { color: var(--ink-3); }
+.sched-table .btn { padding: 4px 9px; font-size: 11.5px; }
+
+/* ── v8: tài khoản đám mây ───────────────────────────── */
+.acct-msg { margin-top: 14px; padding: 10px 13px; border-radius: 12px; font-size: 13.5px; }
+.acct-msg.ok { background: var(--sage-soft); color: var(--sage); }
+.acct-msg.err { background: var(--rose-soft); color: var(--rose-deep); }
+.acct-msg.info { background: var(--gold-soft); color: var(--ink); }
+#btn-cloud.cloud-off { opacity: .5; }
+#btn-cloud.cloud-on { color: var(--sage); border-color: var(--sage-soft); }
+#btn-cloud.cloud-err { color: var(--amber); border-color: var(--amber-soft); }
+#btn-cloud.cloud-busy { animation: cloud-pulse 1.1s ease-in-out infinite; }
+@keyframes cloud-pulse { 50% { opacity: .35; } }
+
+@media (max-width: 720px) {
+  .head-ops { flex-direction: row; align-items: center; width: 100%; justify-content: space-between; }
+  .week-label { font-size: 18px; }
+}
+
+/* Thợ không có lịch hôm nay nhưng vẫn tới làm — nhìn phải khác, đừng bấm nhầm */
+.clock-chip.off-today { border-style: dashed; border-color: var(--amber); opacity: .85; }
+.clock-chip small { font-size: 11px; color: var(--amber); font-weight: 600; letter-spacing: .04em; }
+
+/* Khu Clock in phải chừa khoảng thở, nếu không dòng "Show everyone" đè lên tiêu đề Up next */
+.clockin { margin-bottom: 26px; }
+.clockin.collapsed { margin-bottom: 18px; }
+/* .swatch chỉ có kích thước khi là flex item; trong ô bảng nó là inline nên phải ép inline-block */
+.sched-table .swatch { display: inline-block; vertical-align: middle; margin-right: 4px; }
+.log li.log-empty-row { display: block; }
+
+/* ── v9: khách chờ nhiều phần việc, gán sẵn thợ ──────── */
+/* Thẻ này chứa cả bảng con nên cần rộng hơn thẻ thợ thường */
+.wait-cards { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+.wait-card { border-style: dashed; border-color: var(--amber); gap: 8px; padding: 14px 14px 12px; }
+.wait-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wait-head .btn.subtle { padding: 2px 8px; }
+.wait-age { color: var(--ink-3); font-size: 12px; }
+.wait-age .timer { font-size: 13px; color: var(--ink-2); }
+.wait-note { font-size: 13px; color: var(--ink-2); font-weight: 600; }
+.wait-parts { display: flex; flex-direction: column; gap: 6px; }
+.wait-part {
+  padding: 8px 10px; border-radius: 12px;
+  border: 1px solid var(--hair); background: var(--paper);
+  display: flex; flex-direction: column; gap: 6px;
+}
+/* Đã xếp người = viền xanh. Phải nhìn ra ngay phần nào còn trống mà không cần đọc chữ */
+.wait-part.lined { border-color: var(--sage); background: var(--sage-soft); }
+.wait-part-top { display: flex; align-items: baseline; gap: 8px; }
+.wait-svc { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; }
+.wait-w { font-size: 11px; background: var(--gold-soft); color: var(--ink); padding: 1px 6px; border-radius: 6px; }
+.wait-x { padding: 0 6px !important; font-size: 12px; line-height: 1.4; }
+.wait-part-ops { display: flex; align-items: center; gap: 6px; }
+.wait-part-ops .swatch.wait-dot { flex: 0 0 auto; }
+.select-tech { flex: 1; min-width: 0; padding: 6px 8px; font-size: 13px; border-radius: 9px; cursor: pointer; }
+.wait-part-ops .btn { flex: 0 0 auto; padding: 6px 14px; font-size: 13px; }
+.wait-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.wait-total { font-size: 12px; color: var(--ink-3); }
+.wait-foot .btn { padding: 5px 10px; font-size: 12px; }
+.log li.preassign .tag { color: var(--sage); }
+.log li.wait .tag { color: var(--amber); }
+
+/* Chế độ gọn: thẻ khách chờ KHÔNG bị ép thành hàng ngang như thẻ thợ */
+@media (max-width: 1080px) {
+  .board .cards.wait-cards { grid-template-columns: 1fr; }
+  .card.wait-card { flex-direction: column; align-items: stretch; }
+  .wait-card .wait-head, .wait-card .wait-parts, .wait-card .wait-foot { flex-basis: auto; }
+}
+/* Khu Waiting cũng cần chừa khoảng thở như khu Clock in, kẻo đè tiêu đề Up next */
+.waiting { margin-bottom: 26px; }
+.waiting .cards { margin-bottom: 0; }
