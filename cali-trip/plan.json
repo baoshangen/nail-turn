@@ -1,5 +1,16 @@
 [
   {
+    "id": "goc-an-vat-snack-corner",
+    "name": "Góc Ăn Vặt (Snack Corner)",
+    "area": "little-saigon",
+    "slot": "any",
+    "link": "https://www.google.com/maps/search/?api=1&query=Snack%20Corner%20G%C3%B3c%20%C4%82n%20V%E1%BA%B7t%20Little%20Saigon%20Westminster%20CA",
+    "notes": "⚠️ Chưa pin được vị trí chính xác — gửi link Google Maps của quán để mình để đúng chấm. Quán ăn vặt VN, khu Little Saigon.",
+    "seed": true,
+    "votes": {},
+    "addedByName": "Lịch trình"
+  },
+  {
     "id": "cosm-la",
     "name": "Cosm Los Angeles",
     "area": "la",
