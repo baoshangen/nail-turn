@@ -100,6 +100,7 @@ async function init(){
   dayStart = lsGet('trip_daystart',{}) || {};
   importFromHash();
   buildTabs(); bindUI(); render();
+  loadSeedPlan();
 
   claude = window.claude || null;
   db = await getCap('db');
@@ -186,7 +187,10 @@ async function updatePlace(id,f){
 }
 async function deletePlace(id){
   const li=localPlaces.findIndex(p=>p.id===id);
-  if(li>=0){ localPlaces.splice(li,1); lsSet('trip_local',localPlaces); render(); refreshMapIfVisible(); return; }
+  if(li>=0){
+    if(localPlaces[li].seed){ const h=lsGet('trip_hidden_seeds',[])||[]; if(h.indexOf(id)<0){ h.push(id); lsSet('trip_hidden_seeds',h); } }
+    localPlaces.splice(li,1); lsSet('trip_local',localPlaces); render(); refreshMapIfVisible(); return;
+  }
   if(db){ try{ await db.doc('places/'+id).delete(); toast('Đã xoá'); }catch(e){ handleWriteErr(e); } }
 }
 async function toggleVote(p){
@@ -429,6 +433,19 @@ function importFromHash(){
     const have={}; localPlaces.forEach(p=>{have[p.id]=1;});
     arr.forEach(it=>{ if(it&&(it.name||it.link)){ const id=it.id||uid(); if(have[id]) return; const o=Object.assign({},it); o.id=id; delete o._shared; delete o._local; localPlaces.push(o); have[id]=1; } });
     lsSet('trip_local',localPlaces);
+  }catch(e){}
+}
+async function loadSeedPlan(){
+  try{
+    const r=await fetch('plan.json?t='+Date.now(), {cache:'no-store'});
+    if(!r.ok) return;
+    const arr=await r.json(); if(!Array.isArray(arr)) return;
+    const hidden=lsGet('trip_hidden_seeds',[])||[];
+    localPlaces=localPlaces.filter(p=>!p.seed);
+    const have={}; localPlaces.forEach(p=>{have[p.id]=1;});
+    arr.forEach(it=>{ if(it&&(it.name||it.link)){ const id=it.id||('seed-'+uid()); if(hidden.indexOf(id)>=0) return; if(have[id]) return; const o=Object.assign({},it); o.id=id; o.seed=true; if(o.votes==null) o.votes={}; if(!o.addedByName) o.addedByName='Lịch trình'; localPlaces.push(o); have[id]=1; } });
+    lsSet('trip_local',localPlaces);
+    render(); refreshMapIfVisible();
   }catch(e){}
 }
 function doExport(){
