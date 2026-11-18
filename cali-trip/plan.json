@@ -7,7 +7,7 @@
     "link": "https://www.google.com/maps/search/?api=1&query=Cosm%20Los%20Angeles%201252%20District%20Dr%20Inglewood%20CA",
     "lat": 33.9555,
     "lng": -118.3375,
-    "notes": "Immersive dome 87ft (shared reality) — Hollywood Park, cạnh SoFi Stadium. 1252 District Dr, Inglewood 90305.",
+    "notes": "Immersive dome 87ft (shared reality) — Hollywood Park, canh SoFi Stadium. 1252 District Dr, Inglewood 90305.",
     "seed": true,
     "votes": {},
     "addedByName": "Lịch trình"
@@ -21,6 +21,19 @@
     "lat": 34.0780,
     "lng": -118.4741,
     "notes": "Bao tang nghe thuat tren doi Brentwood. Vao cua MIEN PHI (dau xe tra phi ~25$). View LA + bien dep. Nghi Thu 2. 1200 Getty Center Dr, LA 90049.",
+    "seed": true,
+    "votes": {},
+    "addedByName": "Lịch trình"
+  },
+  {
+    "id": "the-broad",
+    "name": "The Broad",
+    "area": "la",
+    "slot": "any",
+    "link": "https://www.google.com/maps/search/?api=1&query=The%20Broad%20221%20S%20Grand%20Ave%20Los%20Angeles%20CA",
+    "lat": 34.0544,
+    "lng": -118.2506,
+    "notes": "Bao tang nghe thuat duong dai DTLA, canh Walt Disney Concert Hall. Vao cua MIEN PHI (nen dat timed ticket truoc). Infinity Mirror Room phai dat rieng, het ve rat nhanh. Nghi Thu 2. 221 S Grand Ave 90012.",
     "seed": true,
     "votes": {},
     "addedByName": "Lịch trình"
