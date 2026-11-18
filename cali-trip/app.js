@@ -147,6 +147,33 @@ async function createPlace(f){
   const lp=Object.assign({id:uid()},data); localPlaces.push(lp); lsSet('trip_local',localPlaces);
   toast(db?'Lưu vào bản của bạn (chưa sync)':'Đã lưu (offline)'); render(); refreshMapIfVisible();
 }
+
+async function resolveName(link){
+  const gm = link.match(/\/maps\/place\/([^\/@?]+)/i);
+  if(gm){ try{ return decodeURIComponent(gm[1].replace(/\+/g,' ')).replace(/\s+/g,' ').trim().slice(0,70); }catch(e){ return gm[1].replace(/\+/g,' ').trim(); } }
+  if(/tiktok\.com/i.test(link)){
+    try{
+      const r=await fetch('https://www.tiktok.com/oembed?url='+encodeURIComponent(link));
+      if(r.ok){ const j=await r.json(); let t=(j.title||'').replace(/#[^\s#]+/g,'').replace(/\s+/g,' ').trim(); if(t) return t.slice(0,70); if(j.author_name) return 'TikTok · '+j.author_name; }
+    }catch(e){}
+    return 'Quán từ TikTok';
+  }
+  if(/instagram\.com/i.test(link)) return 'Quán từ Instagram';
+  return 'Địa điểm mới';
+}
+async function quickAdd(dayId){
+  const inp=$('#qaInput'); if(!inp) return;
+  const link=(inp.value||'').trim();
+  if(!/^https?:\/\//i.test(link)){ if(link) toast('Dán link bắt đầu bằng http vô nha'); return; }
+  inp.value=''; inp.disabled=true; inp.placeholder='Đang thêm…';
+  const day=DAYS.find(d=>d.id===dayId)||DAYS[0];
+  const name=await resolveName(link);
+  const coords=parseCoords(link);
+  const f={ name:name||'Địa điểm mới', link:link, area:day.area, slot:'any', addr: coords?link:'', notes:'' };
+  if(coords){ f.lat=coords.lat; f.lng=coords.lng; }
+  await createPlace(f);
+  const i2=$('#qaInput'); if(i2){ i2.disabled=false; i2.placeholder='Dán link khác…'; try{i2.focus();}catch(e){} }
+}
 async function updatePlace(id,f){
   const data=placePayload(f);
   const local=localPlaces.find(p=>p.id===id);
@@ -211,6 +238,9 @@ function renderDayView(dayId){
   const wrap=el('div','dayview');
   wrap.style.setProperty('--c1',day.c1); wrap.style.setProperty('--c2',day.c2);
   wrap.appendChild(el('div','dayhead','<div class="dayemoji">'+day.emoji+'</div><div><h2>'+esc(day.title)+'</h2><p>'+esc(day.sub)+'</p></div>'));
+  const qa=el('div','quickadd');
+  qa.innerHTML='<input id="qaInput" type="url" inputmode="url" autocomplete="off" placeholder="Dán link TikTok / IG / Google Maps…"><button class="btn primary" data-act="quickadd" data-day="'+dayId+'">+ Thêm</button>';
+  wrap.appendChild(qa);
   const places=allPlaces().filter(p=>dayOf(p)===dayId);
   if(!places.length){
     const e=el('div','empty','<div class="bigemoji">'+day.emoji+'</div><p>Chưa có địa điểm nào cho ngày này.<br>Dán link TikTok/IG hoặc tự thêm quán nha!</p><button class="btn primary big" data-act="add" data-day="'+dayId+'">+ Thêm địa điểm</button>');
@@ -468,6 +498,7 @@ function bindUI(){
     const act=t.dataset.act, id=t.dataset.id;
     if(act==='tab'){ state.tab=isNaN(+t.dataset.tab)?t.dataset.tab:+t.dataset.tab; render(); }
     else if(act==='add'){ openModal(null, +t.dataset.day||(typeof state.tab==='number'?state.tab:1)); }
+    else if(act==='quickadd'){ quickAdd(+t.dataset.day); }
     else if(act==='sugg'){ openModal({name:t.dataset.name, area:(DAYS.find(d=>String(d.id)===String(t.dataset.day))||DAYS[0]).area, slot:'any'}, +t.dataset.day); }
     else if(act==='edit'){ const p=allPlaces().find(x=>x.id===id); if(p) openModal(p); }
     else if(act==='del'){ if(confirm('Xoá địa điểm này?')) deletePlace(id); }
@@ -483,6 +514,8 @@ function bindUI(){
     else if(act==='import'){ doImport(); }
   });
   document.addEventListener('click',e=>{ if(e.target.id==='modal') closeModal(); if(e.target.id==='ioModal') closeIO(); });
+  document.addEventListener('keydown',e=>{ if(e.target&&e.target.id==='qaInput'&&e.key==='Enter'){ e.preventDefault(); if(typeof state.tab==='number') quickAdd(state.tab); } });
+  document.addEventListener('paste',e=>{ if(e.target&&e.target.id==='qaInput'&&typeof state.tab==='number'){ setTimeout(()=>quickAdd(state.tab),60); } });
   const fab=$('#fab'); if(fab) fab.addEventListener('click',()=>openModal(null, (typeof state.tab==='number')?state.tab:1));
 }
 function buildTabs(){
