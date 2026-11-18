@@ -214,10 +214,7 @@ function renderDayView(dayId){
   const places=allPlaces().filter(p=>dayOf(p)===dayId);
   if(!places.length){
     const e=el('div','empty','<div class="bigemoji">'+day.emoji+'</div><p>Chưa có địa điểm nào cho ngày này.<br>Dán link TikTok/IG hoặc tự thêm quán nha!</p><button class="btn primary big" data-act="add" data-day="'+dayId+'">+ Thêm địa điểm</button>');
-    const st=el('div','suggtitle',null); st.textContent='Gợi ý nhanh — bấm để thêm'; e.appendChild(st);
-    const sg=el('div','suggs');
-    (SUGGEST[day.area]||[]).forEach(n=>{ const b=el('button','sugg',null); b.textContent='+ '+n; b.dataset.act='sugg'; b.dataset.name=n; b.dataset.day=dayId; sg.appendChild(b); });
-    e.appendChild(sg); wrap.appendChild(e); return wrap;
+    wrap.appendChild(e); return wrap;
   }
   for(const slot of SLOTS){
     const sp=sortPlaces(places.filter(p=>(p.slot||'any')===slot.id));
