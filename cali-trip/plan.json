@@ -31,7 +31,7 @@
     "area": "la",
     "slot": "any",
     "link": "https://www.google.com/maps/search/?api=1&query=The%20Getty%20Center%201200%20Getty%20Center%20Dr%20Los%20Angeles%20CA",
-    "lat": 34.0780,
+    "lat": 34.078,
     "lng": -118.4741,
     "notes": "Bao tang nghe thuat tren doi Brentwood. Vao cua MIEN PHI (dau xe tra phi ~25$). View LA + bien dep. Nghi Thu 2. 1200 Getty Center Dr, LA 90049.",
     "seed": true,
@@ -47,6 +47,19 @@
     "lat": 34.0544,
     "lng": -118.2506,
     "notes": "Bao tang nghe thuat duong dai DTLA, canh Walt Disney Concert Hall. Vao cua MIEN PHI (nen dat timed ticket truoc). Infinity Mirror Room phai dat rieng, het ve rat nhanh. Nghi Thu 2. 221 S Grand Ave 90012.",
+    "seed": true,
+    "votes": {},
+    "addedByName": "Lịch trình"
+  },
+  {
+    "id": "griffith-observatory",
+    "name": "Griffith Observatory",
+    "area": "la",
+    "slot": "any",
+    "link": "https://www.google.com/maps/search/?api=1&query=Griffith%20Observatory%202800%20E%20Observatory%20Rd%20Los%20Angeles%20CA",
+    "lat": 34.1184,
+    "lng": -118.3004,
+    "notes": "View toan canh LA + Hollywood Sign. Vao cua MIEN PHI (dau xe tra phi). Nghi Thu 2. Di xe chieu toi ngam hoang hon + den thanh pho. 2800 E Observatory Rd, LA 90027.",
     "seed": true,
     "votes": {},
     "addedByName": "Lịch trình"
