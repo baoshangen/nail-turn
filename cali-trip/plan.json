@@ -11,5 +11,18 @@
     "seed": true,
     "votes": {},
     "addedByName": "Lịch trình"
+  },
+  {
+    "id": "getty-center",
+    "name": "The Getty Center",
+    "area": "la",
+    "slot": "any",
+    "link": "https://www.google.com/maps/search/?api=1&query=The%20Getty%20Center%201200%20Getty%20Center%20Dr%20Los%20Angeles%20CA",
+    "lat": 34.0780,
+    "lng": -118.4741,
+    "notes": "Bao tang nghe thuat tren doi Brentwood. Vao cua MIEN PHI (dau xe tra phi ~25$). View LA + bien dep. Nghi Thu 2. 1200 Getty Center Dr, LA 90049.",
+    "seed": true,
+    "votes": {},
+    "addedByName": "Lịch trình"
   }
 ]
