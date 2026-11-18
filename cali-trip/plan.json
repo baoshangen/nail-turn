@@ -1,1 +1,15 @@
-[]
+[
+  {
+    "id": "cosm-la",
+    "name": "Cosm Los Angeles",
+    "area": "la",
+    "slot": "any",
+    "link": "https://www.google.com/maps/search/?api=1&query=Cosm%20Los%20Angeles%201252%20District%20Dr%20Inglewood%20CA",
+    "lat": 33.9555,
+    "lng": -118.3375,
+    "notes": "Immersive dome 87ft (shared reality) — Hollywood Park, cạnh SoFi Stadium. 1252 District Dr, Inglewood 90305.",
+    "seed": true,
+    "votes": {},
+    "addedByName": "Lịch trình"
+  }
+]
