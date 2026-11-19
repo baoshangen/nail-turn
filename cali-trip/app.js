@@ -93,7 +93,8 @@ function effectiveOrder(dayId){ const o=lsGet('trip_order',{})||{}; return o[day
 function sortByManual(list, dayId){
   const ord=effectiveOrder(dayId);
   const idx=id=>{ const i=ord.indexOf(id); return i<0?9999:i; };
-  return list.slice().sort((a,b)=> (idx(a.id)-idx(b.id)) || (voteCount(b)-voteCount(a)) || ((a.createdAt||0)-(b.createdAt||0)) );
+  const sq=x=> (x.seq==null?9999:x.seq);
+  return list.slice().sort((a,b)=> (idx(a.id)-idx(b.id)) || (sq(a)-sq(b)) || (voteCount(b)-voteCount(a)) || ((a.createdAt||0)-(b.createdAt||0)) );
 }
 function movePlace(id,dir){
   const p=allPlaces().find(x=>x.id===id); if(!p) return;
@@ -462,7 +463,7 @@ async function loadSeedPlan(){
     const hidden=lsGet('trip_hidden_seeds',[])||[];
     localPlaces=localPlaces.filter(p=>!p.seed);
     const have={}; localPlaces.forEach(p=>{have[p.id]=1;});
-    arr.forEach(it=>{ if(it&&(it.name||it.link)){ const id=it.id||('seed-'+uid()); if(hidden.indexOf(id)>=0) return; if(have[id]) return; const o=Object.assign({},it); o.id=id; o.seed=true; if(o.votes==null) o.votes={}; if(!o.addedByName) o.addedByName='Lịch trình'; localPlaces.push(o); have[id]=1; } });
+    arr.forEach(function(it,si){ if(it&&(it.name||it.link)){ const id=it.id||('seed-'+uid()); if(hidden.indexOf(id)>=0) return; if(have[id]) return; const o=Object.assign({},it); o.id=id; o.seed=true; o.seq=si; if(o.votes==null) o.votes={}; if(!o.addedByName) o.addedByName='Lịch trình'; localPlaces.push(o); have[id]=1; } });
     lsSet('trip_local',localPlaces);
     render(); refreshMapIfVisible();
   }catch(e){}
