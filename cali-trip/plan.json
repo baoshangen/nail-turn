@@ -116,5 +116,16 @@
     "seed": true,
     "votes": {},
     "addedByName": "Lịch trình"
+  },
+  {
+    "id": "coco-che",
+    "name": "Coco Chè",
+    "area": "little-saigon",
+    "slot": "any",
+    "link": "https://www.google.com/maps/search/?api=1&query=Coco%20Che%20dessert%20Westminster%20CA%20Little%20Saigon",
+    "notes": "Quan che MOI MO o Little Saigon/Westminster, cho ngoi xinh de chill/study. ⚠️ Chua pin duoc dia chi chinh xac (quan moi) - gui link Google Maps de minh pin dung.",
+    "seed": true,
+    "votes": {},
+    "addedByName": "Lịch trình"
   }
 ]
