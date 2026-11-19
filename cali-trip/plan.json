@@ -93,13 +93,13 @@
   },
   {
     "id": "grandpas-kitchen-gg",
-    "name": "Grandpa's Kitchen (Grill - Bar 168)",
+    "name": "Grandpa District / Grandpa's Kitchen",
     "area": "little-saigon",
     "slot": "any",
     "link": "https://www.google.com/maps/search/?api=1&query=Grandpa%27s%20Kitchen%2014208%20Brookhurst%20St%20Garden%20Grove%20CA%2092843",
     "lat": 33.7575,
     "lng": -117.9543,
-    "notes": "Quan VN o Garden Grove (Little Saigon). Mon nen thu: banh mi chao, bo ne, cha trung chien (battered egg fritters). 14208 Brookhurst St, Garden Grove 92843.",
+    "notes": "Khu an vat via he VN o Garden Grove (ban ghe nhua ngoai troi, nhieu mon): bot chien, banh trang tron, pha lau, xien que, banh mi chao, bo ne, cha trung chien. 14208 Brookhurst St, Garden Grove 92843.",
     "seed": true,
     "votes": {},
     "addedByName": "Lịch trình"
