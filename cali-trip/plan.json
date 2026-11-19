@@ -77,5 +77,18 @@
     "seed": true,
     "votes": {},
     "addedByName": "Lịch trình"
+  },
+  {
+    "id": "balboa-island-newport",
+    "name": "Balboa Island (Newport Beach)",
+    "area": "little-saigon",
+    "slot": "any",
+    "link": "https://www.google.com/maps/search/?api=1&query=Balboa%20Island%20Newport%20Beach%20CA",
+    "lat": 33.6061,
+    "lng": -117.8912,
+    "notes": "Dao nho o Newport Beach (OC): phà Balboa Island Ferry (re, cho duoc ca xe + xe dap), tam bien, dao pho Marine Ave (Balboa Bar / frozen banana). ~25 phut tu Little Saigon -> de Ngay 1 (OC). KHONG gan Santa Monica (cach ~1 tieng).",
+    "seed": true,
+    "votes": {},
+    "addedByName": "Lịch trình"
   }
 ]
