@@ -64,19 +64,5 @@
     "seed": true,
     "votes": {},
     "addedByName": "Lịch trình"
-  },
-  {
-    "id": "banh-cuon-tay-ho-westminster",
-    "name": "Bánh Cuốn Tây Hồ (Westminster)",
-    "area": "little-saigon",
-    "slot": "any",
-    "link": "https://www.google.com/maps/search/?api=1&query=Banh%20Cuon%20Tay%20Ho%209242%20Bolsa%20Ave%20Westminster%20CA%2092683",
-    "lat": 33.7445,
-    "lng": -117.9678,
-    "notes": "Banh cuon noi tieng (chuoi tu 1986). Clip ban gui la chi nhanh Santa Clara (Bay Area, xa ~6h) - minh lay chi nhanh Little Saigon cho dung tuyen. Thu Banh Cuon Dac Biet + Nem Cuon. 9242 Bolsa Ave Ste F, Westminster 92683.",
-    "phone": "(714) 895-4796",
-    "seed": true,
-    "votes": {},
-    "addedByName": "Lịch trình"
   }
 ]
