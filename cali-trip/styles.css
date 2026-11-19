@@ -92,8 +92,14 @@ main{padding:16px 16px 10px;max-width:760px;margin:0 auto}
   box-shadow:var(--shadow);border-left:5px solid var(--c1);position:relative;overflow:hidden
 }
 .card.local{border-left-style:dashed;background:#fffdf8}
-.cardtop{display:flex;align-items:flex-start;gap:10px}
+.cardtop{display:flex;align-items:center;gap:9px}
+.ordnum{flex:none;width:26px;height:26px;border-radius:9px;background:linear-gradient(135deg,var(--c1),var(--c2));color:#fff;font-weight:800;font-size:14px;display:grid;place-items:center;font-variant-numeric:tabular-nums}
 .cardname{font-family:'Fredoka';font-weight:600;font-size:17px;line-height:1.25;flex:1;word-break:break-word}
+.movegrp{flex:none;display:inline-flex;flex-direction:column;gap:3px}
+.ordbtn{width:30px;height:22px;border-radius:7px;border:1.5px solid var(--line);background:#fff;font-weight:900;font-size:13px;color:var(--c1);line-height:1;display:grid;place-items:center}
+.ordbtn:active{transform:scale(.9)}
+.ordbtn[disabled]{opacity:.3;pointer-events:none;color:#aaa}
+.reorderhint{font-size:12px;color:var(--muted);font-weight:700;margin:0 2px 12px;line-height:1.45;background:#fff;border-radius:12px;padding:9px 12px;box-shadow:var(--shadow)}
 .vote{
   flex:none;background:#fff;border:1.5px solid var(--line);border-radius:999px;
   padding:7px 12px;font-weight:800;font-size:14px;color:#444;display:flex;gap:4px;align-items:center;transition:.12s

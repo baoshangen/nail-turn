@@ -89,6 +89,22 @@ function allPlaces(){
 function sortPlaces(list){
   return list.slice().sort((a,b)=> (voteCount(b)-voteCount(a)) || ((a.createdAt||0)-(b.createdAt||0)) );
 }
+function effectiveOrder(dayId){ const o=lsGet('trip_order',{})||{}; return o[dayId]||[]; }
+function sortByManual(list, dayId){
+  const ord=effectiveOrder(dayId);
+  const idx=id=>{ const i=ord.indexOf(id); return i<0?9999:i; };
+  return list.slice().sort((a,b)=> (idx(a.id)-idx(b.id)) || (voteCount(b)-voteCount(a)) || ((a.createdAt||0)-(b.createdAt||0)) );
+}
+function movePlace(id,dir){
+  const p=allPlaces().find(x=>x.id===id); if(!p) return;
+  const dayId=dayOf(p);
+  const arr=sortByManual(allPlaces().filter(x=>dayOf(x)===dayId), dayId).map(x=>x.id);
+  const i=arr.indexOf(id), j=i+dir;
+  if(i<0||j<0||j>=arr.length) return;
+  const t=arr[i]; arr[i]=arr[j]; arr[j]=t;
+  const o=lsGet('trip_order',{})||{}; o[dayId]=arr; lsSet('trip_order',o);
+  render();
+}
 
 /* ---------------- Capabilities + init ---------------- */
 async function getCap(name){ try{ if(claude && typeof claude.use==='function') return await claude.use(name); }catch(e){} return null; }
@@ -245,26 +261,29 @@ function renderDayView(dayId){
   const qa=el('div','quickadd');
   qa.innerHTML='<input id="qaInput" type="url" inputmode="url" autocomplete="off" placeholder="Dán link TikTok / IG / Google Maps…"><button class="btn primary" data-act="quickadd" data-day="'+dayId+'">+ Thêm</button>';
   wrap.appendChild(qa);
-  const places=allPlaces().filter(p=>dayOf(p)===dayId);
+  const places=sortByManual(allPlaces().filter(p=>dayOf(p)===dayId), dayId);
   if(!places.length){
     const e=el('div','empty','<div class="bigemoji">'+day.emoji+'</div><p>Chưa có địa điểm nào cho ngày này.<br>Dán link TikTok/IG hoặc tự thêm quán nha!</p><button class="btn primary big" data-act="add" data-day="'+dayId+'">+ Thêm địa điểm</button>');
     wrap.appendChild(e); return wrap;
   }
-  for(const slot of SLOTS){
-    const sp=sortPlaces(places.filter(p=>(p.slot||'any')===slot.id));
-    if(!sp.length) continue;
-    const sec=el('div','slot');
-    sec.appendChild(el('div','slothead',slot.emoji+' '+slot.label+' <span class="count">'+sp.length+'</span>'));
-    const list=el('div','cards'); sp.forEach(p=>list.appendChild(renderCard(p,day))); sec.appendChild(list);
-    wrap.appendChild(sec);
-  }
+  wrap.appendChild(el('div','reorderhint','↕️ Thứ tự đi — bấm ↑ ↓ để kéo lên xuống cho đúng ý (ăn → uống → ăn…). Map & chỉ đường chạy theo thứ tự này.'));
+  const list=el('div','cards');
+  places.forEach((p,i)=> list.appendChild(renderCard(p,day,i,places.length)));
+  wrap.appendChild(list);
   return wrap;
 }
-function renderCard(p,day){
+function renderCard(p,day,i,n){
   const c=el('div','card'+(p._local?' local':''));
   const plat = p.platform==='tiktok'?'🎵 TikTok':p.platform==='instagram'?'📸 IG':p.platform==='web'?'🔗 Link':'';
+  const pos = (i==null?0:i);
   c.innerHTML =
-    '<div class="cardtop"><div class="cardname">'+esc(p.name||'(chưa đặt tên)')+'</div>'+
+    '<div class="cardtop">'+
+      '<span class="ordnum">'+(pos+1)+'</span>'+
+      '<div class="cardname">'+esc(p.name||'(chưa đặt tên)')+'</div>'+
+      '<span class="movegrp">'+
+        '<button class="ordbtn" data-act="up" data-id="'+esc(p.id)+'"'+((pos===0)?' disabled':'')+'>↑</button>'+
+        '<button class="ordbtn" data-act="down" data-id="'+esc(p.id)+'"'+((n!=null&&pos===n-1)?' disabled':'')+'>↓</button>'+
+      '</span>'+
       '<button class="vote '+(iVoted(p)?'on':'')+'" data-act="vote" data-id="'+esc(p.id)+'">👍 <b>'+voteCount(p)+'</b></button></div>'+
     '<div class="meta">'+
       (plat?'<span class="pill">'+plat+'</span>':'')+
@@ -301,7 +320,7 @@ function renderMapView(){
   const w=el('div','mapview');
   w.appendChild(el('div','planintro','🗺️ Bấm là mở Google Maps chỉ đường qua hết các điểm trong ngày (theo thứ tự gợi ý). Trên điện thoại sẽ nhảy thẳng vô app Maps luôn. Muốn chấm đúng vị trí thì khi thêm địa điểm nhớ dán link Google Maps vô ô địa chỉ.'));
   DAYS.forEach(day=>{
-    const places=orderForPlan(allPlaces().filter(p=>dayOf(p)===day.id));
+    const places=sortByManual(allPlaces().filter(p=>dayOf(p)===day.id), day.id);
     const card=el('div','planday'); card.style.setProperty('--c1',day.c1); card.style.setProperty('--c2',day.c2);
     card.appendChild(el('div','plandayhead',day.emoji+' '+esc(day.title)));
     if(!places.length){ card.appendChild(el('div','planempty','Chưa có địa điểm nào.')); w.appendChild(card); return; }
@@ -349,7 +368,7 @@ function renderPlanView(){
     inp.addEventListener('change',()=>{ dayStart[day.id]=inp.value; lsSet('trip_daystart',dayStart); render(); });
     ctrl.appendChild(inp); card.appendChild(ctrl);
     if(!places.length){ card.appendChild(el('div','planempty','Chưa có địa điểm nào.')); w.appendChild(card); return; }
-    const seq=orderForPlan(places); const TRAVEL=20; let t=toMins(startVal);
+    const seq=sortByManual(places, day.id); const TRAVEL=20; let t=toMins(startVal);
     const tl=el('div','timeline');
     seq.forEach(p=>{
       const dur=p.dur||75;
@@ -520,6 +539,8 @@ function bindUI(){
     else if(act==='edit'){ const p=allPlaces().find(x=>x.id===id); if(p) openModal(p); }
     else if(act==='del'){ if(confirm('Xoá địa điểm này?')) deletePlace(id); }
     else if(act==='vote'){ const p=allPlaces().find(x=>x.id===id); if(p) toggleVote(p); }
+    else if(act==='up'){ movePlace(id,-1); }
+    else if(act==='down'){ movePlace(id,1); }
     else if(act==='preview'){ togglePreview(id); }
     else if(act==='save'){ saveModal(); }
     else if(act==='close'){ closeModal(); closeIO(); }
