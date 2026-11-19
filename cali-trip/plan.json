@@ -103,5 +103,18 @@
     "seed": true,
     "votes": {},
     "addedByName": "Lịch trình"
+  },
+  {
+    "id": "tap-hoa-tuoi-tho",
+    "name": "Tạp Hóa Tuổi Thơ",
+    "area": "little-saigon",
+    "slot": "any",
+    "link": "https://www.google.com/maps/search/?api=1&query=Tap%20Hoa%20Tuoi%20Tho%208544%20Westminster%20Blvd%20Westminster%20CA%2092683",
+    "lat": 33.7587,
+    "lng": -117.9792,
+    "notes": "Tap hoa / an vat VN tuoi tho: banh trang tron, do an vat, co ban kit banh trang tron mang ve. 8544 Westminster Blvd, Westminster 92683. (Dia chi theo listing - check lai khi toi.)",
+    "seed": true,
+    "votes": {},
+    "addedByName": "Lịch trình"
   }
 ]
