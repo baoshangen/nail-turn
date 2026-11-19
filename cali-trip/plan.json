@@ -64,5 +64,18 @@
     "seed": true,
     "votes": {},
     "addedByName": "Lịch trình"
+  },
+  {
+    "id": "unu-cafe-irvine",
+    "name": "UNU Cafe (boba buckets)",
+    "area": "little-saigon",
+    "slot": "any",
+    "link": "https://www.google.com/maps/search/?api=1&query=92%20Corporate%20Park%20Ste%20D%20Irvine%20CA%2092606%20boba",
+    "lat": 33.6968,
+    "lng": -117.8415,
+    "notes": "Boba buckets viral + nhieu loai thach/jelly ($1-2/mon). Mo moi ngay 11am-10pm. Bai dau xe nho mien phi, KHONG cho ngoi. O Irvine (OC, ~20ph tu Little Saigon). 92 Corporate Park Ste D, Irvine 92606. Luu y: mot so listing ghi 'Jam Jam' o dia chi nay - co the doi ten, check lai khi toi.",
+    "seed": true,
+    "votes": {},
+    "addedByName": "Lịch trình"
   }
 ]
